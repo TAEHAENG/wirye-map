@@ -1,0 +1,1330 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>위례 트램라인 전체지도</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
+
+:root {
+  --ink: #1a1c2a;
+  --ink2: #2d3148;
+  --line: #e2e5f0;
+  --line2: #c8cde0;
+  --paper: #f0f2f8;
+  --paper2: #ffffff;
+  --blue: #2563eb;
+  --blue-light: #dbeafe;
+  --blue-mid: #93c5fd;
+  --green: #16a34a;
+  --green-light: #dcfce7;
+  --red: #dc2626;
+  --red-light: #fee2e2;
+  --amber: #d97706;
+  --amber-light: #fef3c7;
+  --text: #1a1c2a;
+  --text2: #6b7280;
+  --text3: #9ca3af;
+  --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.14);
+  --topbar-h: 52px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Noto Sans KR', sans-serif;
+  background: var(--paper);
+  color: var(--text);
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── TOPBAR ── */
+.topbar {
+  height: var(--topbar-h);
+  background: var(--paper2);
+  border-bottom: 1.5px solid var(--line);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+  flex-shrink: 0;
+  box-shadow: var(--shadow);
+  z-index: 200;
+}
+
+.topbar-logo {
+  font-weight: 900;
+  font-size: 15px;
+  letter-spacing: -0.5px;
+  color: var(--blue);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.topbar-sep { width: 1px; height: 24px; background: var(--line); flex-shrink: 0; }
+
+.topbar-search {
+  flex: 1;
+  max-width: 280px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--paper);
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  padding: 0 10px;
+  height: 34px;
+}
+.topbar-search input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text);
+  width: 100%;
+}
+.topbar-search input::placeholder { color: var(--text3); }
+
+.topbar-actions { display: flex; gap: 8px; margin-left: auto; }
+
+.btn {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 7px;
+  border: 1.5px solid var(--line);
+  background: var(--paper2);
+  color: var(--text);
+  font-size: 12px;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+.btn:hover { background: var(--blue-light); border-color: var(--blue-mid); color: var(--blue); }
+.btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+.btn.primary:hover { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+
+/* ── MAIN LAYOUT ── */
+.main {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ── MAP CANVAS ── */
+.canvas-wrapper {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  cursor: grab;
+  background:
+    radial-gradient(circle, #c8cde0 1px, transparent 1px);
+  background-size: 28px 28px;
+  background-color: var(--paper);
+}
+.canvas-wrapper.panning { cursor: grabbing; }
+
+.canvas {
+  position: absolute;
+  top: 0; left: 0;
+  width: 3000px;
+  height: 3000px;
+  transform-origin: 0 0;
+}
+
+/* ── BUILDING CARD ── */
+.building-card {
+  position: absolute;
+  width: 320px;
+  background: var(--paper2);
+  border-radius: 12px;
+  border: 1.5px solid var(--line);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: box-shadow 0.15s;
+  user-select: none;
+}
+.building-card:hover { box-shadow: 0 12px 40px rgba(0,0,0,0.18); }
+.building-card.dragging {
+  box-shadow: 0 20px 60px rgba(37,99,235,0.25);
+  border-color: var(--blue-mid);
+  z-index: 100 !important;
+}
+
+/* card header */
+.card-header {
+  background: var(--blue);
+  padding: 10px 12px 8px;
+  cursor: move;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.card-building-name {
+  font-weight: 700;
+  font-size: 14px;
+  color: #fff;
+  letter-spacing: -0.3px;
+}
+.card-room-count {
+  font-size: 11px;
+  color: rgba(255,255,255,0.7);
+  font-weight: 400;
+}
+.card-grip {
+  width: 20px;
+  height: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  justify-content: center;
+  opacity: 0.5;
+}
+.card-grip span {
+  display: block;
+  height: 2px;
+  background: #fff;
+  border-radius: 1px;
+}
+
+/* section tabs */
+.section-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 10px 0;
+  background: #f8f9fe;
+  border-bottom: 1.5px solid var(--line);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+.section-tabs::-webkit-scrollbar { height: 3px; }
+.section-tabs::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 2px; }
+
+.section-tab {
+  padding: 4px 10px 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text2);
+  border: 1.5px solid transparent;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  cursor: pointer;
+  white-space: nowrap;
+  background: transparent;
+  font-family: inherit;
+  transition: color 0.12s, background 0.12s;
+}
+.section-tab:hover { color: var(--blue); }
+.section-tab.active {
+  color: var(--blue);
+  font-weight: 700;
+  background: var(--paper2);
+  border-color: var(--line);
+}
+
+/* floor tabs */
+.floor-tabs {
+  display: flex;
+  gap: 3px;
+  padding: 8px 10px 6px;
+  background: var(--paper2);
+  border-bottom: 1.5px solid var(--line);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+.floor-tabs::-webkit-scrollbar { height: 3px; }
+.floor-tabs::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 2px; }
+
+.floor-tab {
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text2);
+  background: var(--paper);
+  border: 1.5px solid var(--line);
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+  transition: background 0.12s, color 0.12s;
+}
+.floor-tab:hover { background: var(--blue-light); color: var(--blue); border-color: var(--blue-mid); }
+.floor-tab.active {
+  background: var(--blue);
+  color: #fff;
+  border-color: var(--blue);
+  font-weight: 700;
+}
+
+/* room grid */
+.room-grid-wrap {
+  overflow-y: auto;
+  max-height: 280px;
+  padding: 8px 10px 10px;
+}
+.room-grid-wrap::-webkit-scrollbar { width: 4px; }
+.room-grid-wrap::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 2px; }
+
+.room-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 5px;
+}
+
+.room-cell {
+  border-radius: 6px;
+  padding: 5px 4px;
+  text-align: center;
+  cursor: pointer;
+  border: 1.5px solid var(--line);
+  background: var(--paper);
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.room-cell:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+  border-color: var(--blue-mid);
+}
+.room-cell.occupied { background: var(--green-light); border-color: #86efac; }
+.room-cell.vacant { background: var(--red-light); border-color: #fca5a5; }
+.room-cell.highlight { border-color: var(--amber) !important; background: var(--amber-light) !important; box-shadow: 0 0 0 2px var(--amber); }
+
+.room-num {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+.room-name {
+  font-size: 9px;
+  color: var(--text2);
+  line-height: 1.3;
+  margin-top: 2px;
+  word-break: keep-all;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.room-cell.vacant .room-name { color: var(--red); font-weight: 500; }
+
+.room-grid-empty {
+  text-align: center;
+  color: var(--text3);
+  padding: 20px 0;
+  font-size: 12px;
+}
+
+/* card footer stats */
+.card-footer {
+  padding: 6px 10px;
+  background: #f8f9fe;
+  border-top: 1.5px solid var(--line);
+  display: flex;
+  gap: 10px;
+  font-size: 10px;
+  color: var(--text2);
+}
+.stat-item { display: flex; align-items: center; gap: 3px; }
+.stat-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.stat-dot.green { background: var(--green); }
+.stat-dot.red { background: var(--red); }
+
+/* ── DETAIL PANEL ── */
+.detail-panel {
+  width: 300px;
+  background: var(--paper2);
+  border-left: 1.5px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  transform: translateX(100%);
+  transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 150;
+  box-shadow: -4px 0 20px rgba(0,0,0,0.1);
+}
+.detail-panel.open { transform: translateX(0); }
+
+.panel-header {
+  padding: 14px 16px 12px;
+  background: var(--blue);
+  color: #fff;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.panel-title {
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1.3;
+  letter-spacing: -0.3px;
+}
+.panel-subtitle {
+  font-size: 11px;
+  color: rgba(255,255,255,0.75);
+  margin-top: 2px;
+}
+.panel-close {
+  background: rgba(255,255,255,0.2);
+  border: none;
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  color: #fff;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.12s;
+}
+.panel-close:hover { background: rgba(255,255,255,0.35); }
+
+.panel-body { flex: 1; overflow-y: auto; padding: 14px 16px; }
+
+.info-row {
+  display: flex;
+  align-items: baseline;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+  gap: 8px;
+}
+.info-row:last-child { border-bottom: none; }
+.info-label {
+  font-size: 11px;
+  color: var(--text3);
+  font-weight: 500;
+  flex-shrink: 0;
+  width: 70px;
+}
+.info-value {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+  word-break: keep-all;
+  flex: 1;
+}
+.info-value.vacant { color: var(--red); font-weight: 700; }
+.info-value.occupied { color: var(--green); font-weight: 700; }
+.info-value.money { font-weight: 700; color: var(--ink2); font-variant-numeric: tabular-nums; }
+
+.panel-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text3);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin: 14px 0 8px;
+}
+
+.panel-memo {
+  background: var(--paper);
+  border-radius: 7px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* ── STATUS BAR ── */
+.statusbar {
+  height: 26px;
+  background: var(--paper2);
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 16px;
+  font-size: 11px;
+  color: var(--text3);
+  flex-shrink: 0;
+}
+.status-item { display: flex; align-items: center; gap: 4px; }
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--blue-light);
+  color: var(--blue);
+  font-weight: 700;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+/* ── VACANT FILTER ── */
+.filter-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text2);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1.5px solid var(--line);
+  background: var(--paper2);
+  font-family: inherit;
+  transition: background 0.12s;
+}
+.filter-toggle:hover { background: var(--blue-light); }
+.filter-toggle.on { background: var(--red-light); border-color: #fca5a5; color: var(--red); }
+
+/* ── ZOOM CONTROLS ── */
+.zoom-controls {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 100;
+}
+.zoom-btn {
+  width: 34px;
+  height: 34px;
+  background: var(--paper2);
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow);
+  color: var(--text);
+  transition: background 0.12s;
+}
+.zoom-btn:hover { background: var(--blue-light); color: var(--blue); }
+
+.zoom-level {
+  background: var(--paper2);
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text2);
+  box-shadow: var(--shadow);
+}
+
+/* ── LEGEND ── */
+.legend {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  background: var(--paper2);
+  border: 1.5px solid var(--line);
+  border-radius: 9px;
+  padding: 8px 12px;
+  box-shadow: var(--shadow);
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--text2);
+  z-index: 100;
+}
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.legend-box {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1.5px solid;
+}
+.legend-box.occupied { background: var(--green-light); border-color: #86efac; }
+.legend-box.vacant { background: var(--red-light); border-color: #fca5a5; }
+.legend-box.unknown { background: var(--paper); border-color: var(--line2); }
+
+/* ── TOAST ── */
+.toast {
+  position: fixed;
+  bottom: 50px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--ink);
+  color: #fff;
+  padding: 9px 18px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+  z-index: 999;
+  white-space: nowrap;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── LOADING ── */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(240,242,248,0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  gap: 14px;
+}
+.spinner {
+  width: 40px; height: 40px;
+  border: 3px solid var(--line);
+  border-top-color: var(--blue);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: 14px; color: var(--text2); font-weight: 500; }
+
+/* Mobile adjustments */
+@media (max-width: 640px) {
+  .topbar-search { display: none; }
+  .detail-panel { width: 100%; }
+  .building-card { width: 280px; }
+}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text">데이터 로드 중...</div>
+</div>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-logo">
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <rect x="1" y="1" width="6" height="6" rx="1.5" fill="#2563eb"/>
+      <rect x="11" y="1" width="6" height="6" rx="1.5" fill="#93c5fd"/>
+      <rect x="1" y="11" width="6" height="6" rx="1.5" fill="#93c5fd"/>
+      <rect x="11" y="11" width="6" height="6" rx="1.5" fill="#2563eb"/>
+    </svg>
+    위례 트램라인 상가지도
+  </div>
+  <div class="topbar-sep"></div>
+  <div class="topbar-search">
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+      <circle cx="5.5" cy="5.5" r="4.5" stroke="#9ca3af" stroke-width="1.5"/>
+      <path d="M9 9L12 12" stroke="#9ca3af" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+    <input type="text" id="searchInput" placeholder="상호명 검색..." autocomplete="off">
+  </div>
+  <div class="topbar-actions">
+    <button class="filter-toggle" id="vacantFilter" title="공실만 보기">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M4 6h4M6 4v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      공실만 보기
+    </button>
+    <div class="topbar-sep"></div>
+    <button class="btn" id="resetLayout" title="배치 초기화">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <path d="M2 6a4 4 0 1 1 .5 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M2 8V6H4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      배치 초기화
+    </button>
+    <button class="btn primary" id="saveLayout">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <rect x="1" y="1" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/>
+        <rect x="3.5" y="1" width="5" height="4" rx="0.5" fill="currentColor" opacity="0.4"/>
+        <path d="M3 7.5h6M3 9.5h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+      </svg>
+      배치 저장
+    </button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <!-- CANVAS -->
+  <div class="canvas-wrapper" id="canvasWrapper">
+    <div class="canvas" id="canvas"></div>
+    <!-- ZOOM CONTROLS -->
+    <div class="zoom-controls">
+      <button class="zoom-btn" id="zoomIn" title="확대">+</button>
+      <div class="zoom-level" id="zoomLevel">100%</div>
+      <button class="zoom-btn" id="zoomOut" title="축소">−</button>
+      <button class="zoom-btn" id="zoomFit" title="전체 보기" style="font-size:13px;">⊡</button>
+    </div>
+    <!-- LEGEND -->
+    <div class="legend">
+      <div class="legend-item"><div class="legend-box occupied"></div>입점</div>
+      <div class="legend-item"><div class="legend-box vacant"></div>공실</div>
+      <div class="legend-item"><div class="legend-box unknown"></div>미확인</div>
+    </div>
+  </div>
+
+  <!-- DETAIL PANEL -->
+  <div class="detail-panel" id="detailPanel">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title" id="panelTitle">호실 정보</div>
+        <div class="panel-subtitle" id="panelSubtitle"></div>
+      </div>
+      <button class="panel-close" id="panelClose">✕</button>
+    </div>
+    <div class="panel-body" id="panelBody"></div>
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div class="statusbar">
+  <div class="status-item">건물 <span class="status-badge" id="statBuildings">0</span></div>
+  <div class="status-item">전체 호실 <span class="status-badge" id="statRooms">0</span></div>
+  <div class="status-item">공실 <span class="status-badge" id="statVacant" style="background:var(--red-light);color:var(--red)">0</span></div>
+  <div class="status-item" id="statSearch" style="display:none">검색결과 <span class="status-badge" id="statSearchCount">0</span></div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ─────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────
+const STORAGE_KEY = 'wirye_map_layout_v2';
+const SHEET_ID  = '19KWBXPiK-qXycopkNRHNMddmux2cKohtm7fLLyfiZGw';
+const SHEET_GID = '805020193';
+
+let allData = null;        // raw JSON
+let buildings = {};        // { buildingName: { dongName: { floorName: [rooms] } } }
+let cardStates = {};       // { cardId: { section, floor } }
+let positions = {};        // { cardId: { x, y } }
+let zoomScale = 1.0;
+let panOffset = { x: 80, y: 80 };
+let isPanning = false;
+let panStart = { x: 0, y: 0 };
+let isDraggingCard = false;
+let vacantOnly = false;
+let searchQuery = '';
+
+const FLOOR_ORDER = floor => {
+  if (floor === '미지정') return 999;
+  const m = floor.match(/(\d+)/);
+  const n = m ? parseInt(m[1]) : 0;
+  return floor.includes('지하') ? -n : n;
+};
+
+// ─────────────────────────────────────────────
+// LOAD DATA — 구글 시트 직접 연동 (JSONP)
+// ─────────────────────────────────────────────
+function loadData() {
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${SHEET_GID}`;
+
+  // JSONP 방식: <script> 태그로 요청 (CORS 우회)
+  window.__gviz_callback = function(text) {
+    try {
+      // gviz 응답: google.visualization.Query.setResponse({...});
+      const json = JSON.parse(text.replace(/^[^(]+\(/, '').replace(/\);?\s*$/, ''));
+      if (json.status === 'error') throw new Error(json.errors?.[0]?.detailed_message || '시트 오류');
+      const table = json.table;
+      const cols = table.cols.map(c => (c.label || c.id || '').trim());
+      const rows = table.rows.map(row => {
+        const rec = {};
+        (row.c || []).forEach((cell, i) => {
+          if (i < cols.length && cols[i]) {
+            rec[cols[i]] = cell ? (cell.f ?? (cell.v != null ? String(cell.v) : '')) : '';
+          }
+        });
+        return rec;
+      });
+      buildings = groupRows(rows);
+    } catch (e) {
+      showToast('데이터 로드 실패: ' + e.message);
+      buildings = {};
+    }
+    document.getElementById('loadingOverlay').style.display = 'none';
+    initMap();
+  };
+
+  // JSONP 스크립트 삽입
+  const script = document.createElement('script');
+  script.onerror = () => {
+    showToast('구글 시트 연결 실패 — 시트 공유 설정을 확인하세요');
+    document.getElementById('loadingOverlay').style.display = 'none';
+    initMap();
+  };
+  // gviz JSONP는 callback 파라미터 미지원 → fetch로 텍스트 받아 수동 파싱
+  fetch(url)
+    .then(r => r.text())
+    .then(text => window.__gviz_callback(text))
+    .catch(() => script.onerror());
+}
+
+function groupRows(rows) {
+  const grouped = {};
+  rows.forEach(row => {
+    const b = (row['건물명'] || row['상가명'] || '').trim();
+    const d = (row['동'] || '').trim() || '단일동';
+    const h = (row['호'] || '').trim();
+    const f = parseFloor(h);
+    if (!b) return;
+    if (!grouped[b]) grouped[b] = {};
+    if (!grouped[b][d]) grouped[b][d] = {};
+    if (!grouped[b][d][f]) grouped[b][d][f] = [];
+    grouped[b][d][f].push(row);
+  });
+  return grouped;
+}
+
+function parseFloor(room) {
+  room = String(room).trim();
+  if (!room) return '미지정';
+  if (room[0].toUpperCase() === 'B') {
+    const digits = room.replace(/\D/g, '');
+    if (digits) {
+      const n = digits.length > 2 ? digits.slice(0, -2) || '1' : digits[0];
+      return `지하${n.replace(/^0+/, '') || '1'}층`;
+    }
+    return '지하1층';
+  }
+  const digits = room.replace(/\D/g, '');
+  if (!digits) return '미지정';
+  if (digits.length <= 2) return '1층';
+  const n = digits.slice(0, -2).replace(/^0+/, '') || '1';
+  return `${n}층`;
+}
+
+// ─────────────────────────────────────────────
+// INIT MAP
+// ─────────────────────────────────────────────
+function initMap() {
+  loadPositions();
+  renderAllCards();
+  updateStats();
+  applyTransform();
+}
+
+function loadPositions() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) positions = JSON.parse(saved);
+  } catch (e) { positions = {}; }
+}
+
+function savePositions() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(positions));
+  showToast('배치 저장 완료');
+}
+
+function getDefaultPosition(idx) {
+  const cols = 3;
+  const col = idx % cols;
+  const row = Math.floor(idx / cols);
+  return { x: 40 + col * 350, y: 40 + row * 480 };
+}
+
+function renderAllCards() {
+  const canvas = document.getElementById('canvas');
+  canvas.innerHTML = '';
+  const bNames = Object.keys(buildings).sort();
+  bNames.forEach((bName, idx) => {
+    const cardId = 'card_' + btoa(encodeURIComponent(bName)).replace(/[^a-zA-Z0-9]/g, '_');
+    if (!cardStates[cardId]) {
+      const dongs = buildings[bName];
+      const firstSection = Object.keys(dongs).sort()[0];
+      const floors = Object.keys(dongs[firstSection] || {}).sort((a, b) => FLOOR_ORDER(a) - FLOOR_ORDER(b));
+      const defaultFloor = floors.includes('1층') ? '1층' : (floors[0] || '');
+      cardStates[cardId] = { section: firstSection, floor: defaultFloor };
+    }
+    if (!positions[cardId]) positions[cardId] = getDefaultPosition(idx);
+    canvas.appendChild(createCard(bName, cardId));
+  });
+  updateStats();
+}
+
+// ─────────────────────────────────────────────
+// CREATE CARD
+// ─────────────────────────────────────────────
+function createCard(bName, cardId) {
+  const dongs = buildings[bName];
+  const state = cardStates[cardId];
+  const pos = positions[cardId];
+
+  const card = document.createElement('div');
+  card.className = 'building-card';
+  card.id = cardId;
+  card.style.left = pos.x + 'px';
+  card.style.top  = pos.y + 'px';
+  card.style.zIndex = 10;
+
+  // count total rooms
+  let totalRooms = 0;
+  Object.values(dongs).forEach(floors => Object.values(floors).forEach(rooms => totalRooms += rooms.length));
+
+  // ── HEADER
+  card.innerHTML = `
+    <div class="card-header" data-drag="true">
+      <div class="card-title-row">
+        <div class="card-building-name">${escHtml(bName)}</div>
+        <div class="card-grip"><span></span><span></span><span></span></div>
+      </div>
+      <div class="card-room-count">전체 ${totalRooms}개 호실</div>
+    </div>
+  `;
+
+  // ── SECTION TABS (동이 2개 이상일 때만 표시)
+  const sectionNames = Object.keys(dongs).sort();
+  if (sectionNames.length > 1) {
+    const sectionBar = document.createElement('div');
+    sectionBar.className = 'section-tabs';
+    sectionNames.forEach(sec => {
+      const btn = document.createElement('button');
+      btn.className = 'section-tab' + (sec === state.section ? ' active' : '');
+      btn.textContent = sec;
+      btn.addEventListener('click', e => { e.stopPropagation(); switchSection(cardId, bName, sec); });
+      sectionBar.appendChild(btn);
+    });
+    card.appendChild(sectionBar);
+  }
+
+  // ── FLOOR TABS
+  const currentDong = dongs[state.section] || {};
+  const floorNames = Object.keys(currentDong).sort((a, b) => FLOOR_ORDER(a) - FLOOR_ORDER(b));
+  const floorBar = document.createElement('div');
+  floorBar.className = 'floor-tabs';
+  floorNames.forEach(fl => {
+    const btn = document.createElement('button');
+    btn.className = 'floor-tab' + (fl === state.floor ? ' active' : '');
+    btn.textContent = fl;
+    btn.addEventListener('click', e => { e.stopPropagation(); switchFloor(cardId, bName, fl); });
+    floorBar.appendChild(btn);
+  });
+  card.appendChild(floorBar);
+
+  // ── ROOM GRID
+  card.appendChild(buildRoomGrid(cardId, bName));
+
+  // ── FOOTER STATS
+  card.appendChild(buildFooterStats(bName, state));
+
+  // ── DRAG
+  setupCardDrag(card, cardId);
+
+  return card;
+}
+
+function buildRoomGrid(cardId, bName) {
+  const state = cardStates[cardId];
+  const rooms = (buildings[bName][state.section] || {})[state.floor] || [];
+  const wrap = document.createElement('div');
+  wrap.className = 'room-grid-wrap';
+
+  const filteredRooms = vacantOnly
+    ? rooms.filter(r => isVacant(r))
+    : rooms;
+
+  const searchFiltered = searchQuery
+    ? filteredRooms.filter(r => matchSearch(r, searchQuery))
+    : filteredRooms;
+
+  if (searchFiltered.length === 0) {
+    wrap.innerHTML = `<div class="room-grid-empty">${rooms.length === 0 ? '호실 데이터 없음' : '검색 결과 없음'}</div>`;
+    return wrap;
+  }
+
+  const grid = document.createElement('div');
+  grid.className = 'room-grid';
+
+  searchFiltered.forEach(room => {
+    const cell = document.createElement('div');
+    const vacant = isVacant(room);
+    const occupied = isOccupied(room);
+    cell.className = 'room-cell' + (occupied ? ' occupied' : vacant ? ' vacant' : '');
+    if (searchQuery && matchSearch(room, searchQuery)) cell.classList.add('highlight');
+
+    const num = document.createElement('div');
+    num.className = 'room-num';
+    num.textContent = room['호'] || '-';
+
+    const name = document.createElement('div');
+    name.className = 'room-name';
+    name.textContent = roomName(room) || '공실';
+
+    cell.appendChild(num);
+    cell.appendChild(name);
+    cell.addEventListener('click', e => { e.stopPropagation(); openDetail(room, bName); });
+    grid.appendChild(cell);
+  });
+
+  wrap.appendChild(grid);
+  return wrap;
+}
+
+function buildFooterStats(bName, state) {
+  const rooms = (buildings[bName][state.section] || {})[state.floor] || [];
+  const vacant = rooms.filter(r => isVacant(r)).length;
+  const occupied = rooms.filter(r => isOccupied(r)).length;
+  const div = document.createElement('div');
+  div.className = 'card-footer';
+  div.innerHTML = `
+    <div class="stat-item"><div class="stat-dot green"></div>입점 ${occupied}</div>
+    <div class="stat-item"><div class="stat-dot red"></div>공실 ${vacant}</div>
+    <div class="stat-item" style="margin-left:auto;color:var(--text3)">총 ${rooms.length}</div>
+  `;
+  return div;
+}
+
+// ─────────────────────────────────────────────
+// SWITCH SECTION / FLOOR
+// ─────────────────────────────────────────────
+function switchSection(cardId, bName, sec) {
+  const state = cardStates[cardId];
+  state.section = sec;
+  const floors = Object.keys(buildings[bName][sec] || {}).sort((a, b) => FLOOR_ORDER(a) - FLOOR_ORDER(b));
+  state.floor = floors.includes('1층') ? '1층' : (floors[0] || '');
+  rebuildCard(cardId, bName);
+}
+
+function switchFloor(cardId, bName, fl) {
+  cardStates[cardId].floor = fl;
+  rebuildCard(cardId, bName);
+}
+
+function rebuildCard(cardId, bName) {
+  const old = document.getElementById(cardId);
+  if (!old) return;
+  const pos = positions[cardId];
+  const zIdx = old.style.zIndex;
+  const newCard = createCard(bName, cardId);
+  newCard.style.zIndex = zIdx;
+  old.replaceWith(newCard);
+}
+
+// ─────────────────────────────────────────────
+// ROOM STATUS
+// ─────────────────────────────────────────────
+function roomName(room) {
+  return (room['현재상호'] || room['상호'] || '').trim();
+}
+function isVacant(room) {
+  const name = roomName(room);
+  return name === '' || name === '공실' || name === '-';
+}
+function isOccupied(room) {
+  return !isVacant(room);
+}
+function matchSearch(room, q) {
+  const lower = q.toLowerCase();
+  return (roomName(room)).toLowerCase().includes(lower) ||
+         (room['호'] || '').toLowerCase().includes(lower) ||
+         (room['과거입점상호'] || '').toLowerCase().includes(lower);
+}
+
+// ─────────────────────────────────────────────
+// CARD DRAG
+// ─────────────────────────────────────────────
+function setupCardDrag(card, cardId) {
+  let startX, startY, startLeft, startTop;
+  let moved = false;
+
+  function onDown(e) {
+    if (!e.target.closest('[data-drag]') && !e.target.closest('.card-grip')) return;
+    if (e.target.tagName === 'BUTTON') return;
+    e.preventDefault();
+    isDraggingCard = true;
+    moved = false;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    startX = clientX;
+    startY = clientY;
+    startLeft = positions[cardId].x;
+    startTop  = positions[cardId].y;
+    card.style.zIndex = 100;
+    card.classList.add('dragging');
+
+    function onMove(e2) {
+      const cx = e2.touches ? e2.touches[0].clientX : e2.clientX;
+      const cy = e2.touches ? e2.touches[0].clientY : e2.clientY;
+      const dx = (cx - startX) / zoomScale;
+      const dy = (cy - startY) / zoomScale;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true;
+      positions[cardId].x = startLeft + dx;
+      positions[cardId].y = startTop  + dy;
+      card.style.left = positions[cardId].x + 'px';
+      card.style.top  = positions[cardId].y + 'px';
+    }
+
+    function onUp() {
+      isDraggingCard = false;
+      card.style.zIndex = 10;
+      card.classList.remove('dragging');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup',   onUp);
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend',  onUp);
+    }
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup',   onUp);
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('touchend',  onUp);
+  }
+
+  card.addEventListener('mousedown',  onDown);
+  card.addEventListener('touchstart', onDown, { passive: false });
+}
+
+// ─────────────────────────────────────────────
+// CANVAS PAN & ZOOM
+// ─────────────────────────────────────────────
+function applyTransform() {
+  const canvas = document.getElementById('canvas');
+  canvas.style.transform = `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomScale})`;
+  document.getElementById('zoomLevel').textContent = Math.round(zoomScale * 100) + '%';
+}
+
+function setZoom(newScale) {
+  zoomScale = Math.min(Math.max(newScale, 0.3), 2.0);
+  applyTransform();
+}
+
+const wrapper = document.getElementById('canvasWrapper');
+
+// Pan (mouse)
+wrapper.addEventListener('mousedown', e => {
+  if (isDraggingCard) return;
+  if (e.target.closest('.building-card')) return;
+  isPanning = true;
+  panStart = { x: e.clientX - panOffset.x, y: e.clientY - panOffset.y };
+  wrapper.classList.add('panning');
+});
+document.addEventListener('mousemove', e => {
+  if (!isPanning) return;
+  panOffset.x = e.clientX - panStart.x;
+  panOffset.y = e.clientY - panStart.y;
+  applyTransform();
+});
+document.addEventListener('mouseup', () => { isPanning = false; wrapper.classList.remove('panning'); });
+
+// Pan (touch)
+let touchPanStart = null;
+wrapper.addEventListener('touchstart', e => {
+  if (isDraggingCard) return;
+  if (e.target.closest('.building-card')) return;
+  if (e.touches.length === 1) {
+    touchPanStart = { x: e.touches[0].clientX - panOffset.x, y: e.touches[0].clientY - panOffset.y };
+  }
+}, { passive: true });
+wrapper.addEventListener('touchmove', e => {
+  if (!touchPanStart || e.touches.length !== 1) return;
+  panOffset.x = e.touches[0].clientX - touchPanStart.x;
+  panOffset.y = e.touches[0].clientY - touchPanStart.y;
+  applyTransform();
+}, { passive: true });
+wrapper.addEventListener('touchend', () => { touchPanStart = null; });
+
+// Wheel zoom
+wrapper.addEventListener('wheel', e => {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? -0.08 : 0.08;
+  setZoom(zoomScale + delta);
+}, { passive: false });
+
+// Zoom buttons
+document.getElementById('zoomIn').addEventListener('click',  () => setZoom(zoomScale + 0.1));
+document.getElementById('zoomOut').addEventListener('click', () => setZoom(zoomScale - 0.1));
+document.getElementById('zoomFit').addEventListener('click', () => {
+  zoomScale = 1.0;
+  panOffset = { x: 80, y: 80 };
+  applyTransform();
+});
+
+// ─────────────────────────────────────────────
+// DETAIL PANEL
+// ─────────────────────────────────────────────
+function openDetail(room, bName) {
+  const panel = document.getElementById('detailPanel');
+  const title = document.getElementById('panelTitle');
+  const subtitle = document.getElementById('panelSubtitle');
+  const body = document.getElementById('panelBody');
+
+  const ho    = room['호'] || '-';
+  const name  = roomName(room) || '공실';
+  const dong  = room['동'] || '';
+  const floor = parseFloor(room['호'] || '');
+
+  title.textContent = `${ho}호 — ${name}`;
+  subtitle.textContent = `${bName}${dong ? ' · ' + dong : ''} · ${floor}`;
+
+  function rv(key) { return room[key] || ''; }
+
+  const fields = [
+    ['상태',      isVacant(room) ? '<span class="vacant">공실</span>' : '<span class="occupied">입점</span>'],
+    ['현재상호',  rv('현재상호') || rv('상호')],
+    ['과거상호',  rv('과거입점상호')],
+    ['전용(평)',  rv('전용(평)') || rv('전용 평')],
+    ['보증금',    rv('보증금') ? rv('보증금') + ' 만원' : ''],
+    ['월세',      rv('월세') ? rv('월세') + ' 만원' : ''],
+    ['매매가',    rv('매매가') ? rv('매매가') : ''],
+    ['소유자',    rv('소유자')],
+    ['프로세스',  rv('프로세스')],
+    ['유형',      rv('유형')],
+  ];
+
+  let html = '';
+  fields.forEach(([label, val]) => {
+    if (!val) return;
+    const cls = label === '상태' ? '' : (label === '보증금' || label === '월세' || label === '매매가' ? ' money' : '');
+    html += `<div class="info-row"><div class="info-label">${label}</div><div class="info-value${cls}">${val}</div></div>`;
+  });
+
+  const memo = rv('상담 내용') || rv('내용');
+  if (memo) {
+    html += `<div class="panel-section-title">상담 내용</div><div class="panel-memo">${escHtml(memo)}</div>`;
+  }
+
+  body.innerHTML = html || '<div style="color:var(--text3);text-align:center;padding:20px">데이터 없음</div>';
+  panel.classList.add('open');
+}
+
+document.getElementById('panelClose').addEventListener('click', () => {
+  document.getElementById('detailPanel').classList.remove('open');
+});
+
+// ─────────────────────────────────────────────
+// SEARCH
+// ─────────────────────────────────────────────
+document.getElementById('searchInput').addEventListener('input', e => {
+  searchQuery = e.target.value.trim();
+  refreshAllCards();
+  const statSearch = document.getElementById('statSearch');
+  if (searchQuery) {
+    let count = 0;
+    Object.entries(buildings).forEach(([bName, dongs]) => {
+      Object.values(dongs).forEach(floors => Object.values(floors).forEach(rooms => {
+        rooms.forEach(r => { if (matchSearch(r, searchQuery)) count++; });
+      }));
+    });
+    document.getElementById('statSearchCount').textContent = count;
+    statSearch.style.display = 'flex';
+  } else {
+    statSearch.style.display = 'none';
+  }
+});
+
+// ─────────────────────────────────────────────
+// VACANT FILTER
+// ─────────────────────────────────────────────
+document.getElementById('vacantFilter').addEventListener('click', function() {
+  vacantOnly = !vacantOnly;
+  this.classList.toggle('on', vacantOnly);
+  this.querySelector('svg').style.display = vacantOnly ? 'none' : '';
+  this.childNodes[this.childNodes.length - 1].textContent = vacantOnly ? ' 전체 보기' : ' 공실만 보기';
+  refreshAllCards();
+});
+
+function refreshAllCards() {
+  Object.keys(buildings).forEach((bName, idx) => {
+    const cardId = 'card_' + btoa(encodeURIComponent(bName)).replace(/[^a-zA-Z0-9]/g, '_');
+    rebuildCard(cardId, bName);
+  });
+  updateStats();
+}
+
+// ─────────────────────────────────────────────
+// STATS
+// ─────────────────────────────────────────────
+function updateStats() {
+  const bNames = Object.keys(buildings);
+  document.getElementById('statBuildings').textContent = bNames.length;
+  let total = 0, vacant = 0;
+  bNames.forEach(b => Object.values(buildings[b]).forEach(floors =>
+    Object.values(floors).forEach(rooms => {
+      total += rooms.length;
+      vacant += rooms.filter(r => isVacant(r)).length;
+    })
+  ));
+  document.getElementById('statRooms').textContent = total;
+  document.getElementById('statVacant').textContent = vacant;
+}
+
+// ─────────────────────────────────────────────
+// SAVE / RESET
+// ─────────────────────────────────────────────
+document.getElementById('saveLayout').addEventListener('click', savePositions);
+
+document.getElementById('resetLayout').addEventListener('click', () => {
+  if (!confirm('배치를 초기화하면 저장된 위치가 삭제됩니다. 계속할까요?')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  positions = {};
+  Object.keys(buildings).forEach((bName, idx) => {
+    const cardId = 'card_' + btoa(encodeURIComponent(bName)).replace(/[^a-zA-Z0-9]/g, '_');
+    positions[cardId] = getDefaultPosition(idx);
+    const card = document.getElementById(cardId);
+    if (card) {
+      card.style.left = positions[cardId].x + 'px';
+      card.style.top  = positions[cardId].y + 'px';
+    }
+  });
+  showToast('배치 초기화 완료');
+});
+
+// ─────────────────────────────────────────────
+// TOAST
+// ─────────────────────────────────────────────
+let toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+// ─────────────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────────────
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─────────────────────────────────────────────
+// BOOT
+// ─────────────────────────────────────────────
+loadData();
+</script>
+</body>
+</html>
