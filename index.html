@@ -213,6 +213,30 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 .ed-zoom-btn:hover{background:var(--paper);color:var(--blue)}
 .ed-zoom-val{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text2);padding:3px 4px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);width:100%;text-align:center}
 
+/* 열 정렬 가이드라인 */
+.ed-align-guide{position:absolute;top:0;bottom:0;width:0;pointer-events:none;z-index:35}
+.ed-align-guide::before{content:'';position:absolute;top:0;bottom:0;left:0;width:2px;background:rgba(37,99,235,.55);border-left:2px dashed #2563eb}
+.ed-align-guide-label{position:absolute;top:6px;left:4px;background:#2563eb;color:#fff;font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;white-space:nowrap;font-family:'IBM Plex Mono',monospace}
+.ed-align-guide-drag{position:absolute;bottom:12px;left:-8px;width:18px;height:18px;background:#2563eb;border:2px solid #fff;border-radius:50%;cursor:ew-resize;z-index:36;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+
+/* 대각선 방향 핸들 위젯 */
+.ed-diag-widget{position:absolute;bottom:68px;right:20px;background:var(--paper2);border:1.5px solid var(--line);border-radius:10px;padding:8px 8px 6px;box-shadow:var(--shadow);z-index:50;display:none}
+.ed-diag-widget.visible{display:block}
+.ed-diag-widget-title{font-size:9px;font-weight:700;color:var(--text3);text-align:center;margin-bottom:4px;letter-spacing:.4px;text-transform:uppercase}
+.ed-diag-svg{display:block;cursor:default}
+.ed-diag-info{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text3);text-align:center;margin-top:3px}
+
+/* 배치 설정 섹션 */
+.ed-place-cfg{padding:8px 14px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:7px;flex-shrink:0}
+.ed-place-cfg-row{display:flex;align-items:center;gap:6px}
+.ed-place-cfg-label{font-size:10px;font-weight:700;color:var(--text3);min-width:42px;letter-spacing:.3px;text-transform:uppercase}
+.ed-seg{display:flex;gap:2px;background:var(--paper);border-radius:6px;padding:2px;border:1.5px solid var(--line);flex:1}
+.ed-seg-btn{flex:1;height:22px;font-size:10px;font-weight:600;border:none;background:transparent;color:var(--text2);border-radius:4px;cursor:pointer;font-family:inherit;transition:all .12s;white-space:nowrap}
+.ed-seg-btn:hover{color:var(--blue)}
+.ed-seg-btn.active{background:var(--blue);color:#fff}
+.ed-diag-toggle{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:var(--text2);font-weight:500}
+.ed-diag-toggle input[type=checkbox]{accent-color:var(--blue);width:14px;height:14px;cursor:pointer}
+
 /* ── TOAST ── */
 .toast{position:fixed;bottom:50px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:9px 18px;border-radius:9px;font-size:13px;font-weight:500;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:999;white-space:nowrap}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -336,6 +360,25 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
       </div>
       <div class="ed-dong-tabs" id="edDongTabs"></div>
       <div class="ed-unit-list" id="edUnitList"></div>
+      <!-- 배치 설정: 열 정렬 + 대각선 -->
+      <div class="ed-place-cfg" id="edPlaceCfg">
+        <div class="ed-place-cfg-row">
+          <span class="ed-place-cfg-label">열 정렬</span>
+          <div class="ed-seg">
+            <button class="ed-seg-btn active" id="edAlignNone" onclick="edSetAlign('none')">없음</button>
+            <button class="ed-seg-btn" id="edAlignLeft" onclick="edSetAlign('left')">⬅ 왼쪽</button>
+            <button class="ed-seg-btn" id="edAlignRight" onclick="edSetAlign('right')">오른쪽 ➡</button>
+          </div>
+        </div>
+        <div class="ed-place-cfg-row">
+          <span class="ed-place-cfg-label">대각선</span>
+          <label class="ed-diag-toggle">
+            <input type="checkbox" id="edDiagCheck" onchange="edToggleDiag(this.checked)">
+            자동 대각선 배치 <span id="edDiagAngleLabel" style="font-size:9px;color:var(--blue);font-family:'IBM Plex Mono',monospace"></span>
+          </label>
+        </div>
+      </div>
+
       <div class="ed-sidebar-foot">
         <div class="ed-hint">목록에서 호수 선택 후 평면도를 클릭해 위치 지정</div>
         <div style="display:flex;gap:6px">
@@ -367,7 +410,19 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
       <div class="ed-canvas-scroller" id="edCanvasScroller" style="display:none">
         <div class="ed-canvas-wrapper" id="edCanvasWrapper">
           <img id="ed-floorplan-img" src="" alt="평면도" draggable="false">
+          <!-- 열 정렬 가이드라인 (JS로 추가됨) -->
         </div>
+      </div>
+      <!-- 대각선 방향 핸들 위젯 -->
+      <div class="ed-diag-widget" id="edDiagWidget">
+        <div class="ed-diag-widget-title">대각선 방향</div>
+        <svg class="ed-diag-svg" id="edDiagSvg" width="90" height="90" viewBox="0 0 90 90">
+          <circle cx="45" cy="45" r="5" fill="#93c5fd" stroke="#2563eb" stroke-width="1.5"/>
+          <line id="edDiagLine" x1="45" y1="45" x2="75" y2="67" stroke="#2563eb" stroke-width="2" stroke-dasharray="4,3" stroke-linecap="round"/>
+          <circle id="edDiagEndDot" cx="75" cy="67" r="7" fill="#2563eb" stroke="#fff" stroke-width="2" cursor="grab" style="filter:drop-shadow(0 2px 4px rgba(37,99,235,.4))"/>
+          <text x="45" y="41" font-size="8" fill="#9ca3af" text-anchor="middle" font-family="sans-serif">시작</text>
+        </svg>
+        <div class="ed-diag-info" id="edDiagInfo">dx: 0% / dy: 0%</div>
       </div>
       <div class="ed-zoom-bar" id="edZoomBar" style="display:none">
         <button class="ed-zoom-btn" onclick="edChangeZoom(0.15)">+</button>
@@ -742,6 +797,102 @@ let edZoom = 1.0;
 let edActiveDong = '전체';
 let edDragging = null, edResizing = null;
 
+// ── 열 정렬 상태 ──
+let edAlignMode = 'none';   // 'none' | 'left' | 'right'
+let edAlignX   = 8;         // 정렬 기준 X (% of image, 기본 8%)
+
+// ── 대각선 방향 상태 ──
+let edDiagMode = false;     // 자동 대각선 ON/OFF
+let edDiagDX   = 8;         // X 오프셋 (%)
+let edDiagDY   = 6;         // Y 오프셋 (%)
+let _diagBasePlaced = null; // 대각선 기준 박스 위치
+
+function edSetAlign(mode) {
+  edAlignMode = mode;
+  ['None','Left','Right'].forEach(k => {
+    const el = document.getElementById('edAlign'+k);
+    if (el) el.classList.toggle('active', 'edAlign'+k === 'edAlign'+mode.charAt(0).toUpperCase()+mode.slice(1) || (mode==='none'&&k==='None'));
+  });
+  edUpdateAlignGuide();
+}
+
+function edToggleDiag(on) {
+  edDiagMode = on;
+  const w = document.getElementById('edDiagWidget');
+  w.classList.toggle('visible', on);
+  _diagBasePlaced = null;
+  edUpdateDiagLabel();
+}
+
+function edUpdateDiagLabel() {
+  const el = document.getElementById('edDiagAngleLabel');
+  if (el) el.textContent = edDiagMode ? `(dx:${edDiagDX.toFixed(1)}% dy:${edDiagDY.toFixed(1)}%)` : '';
+  const info = document.getElementById('edDiagInfo');
+  if (info) info.textContent = `dx: ${edDiagDX.toFixed(1)}%  /  dy: ${edDiagDY.toFixed(1)}%`;
+}
+
+function edUpdateAlignGuide() {
+  const wr = document.getElementById('edCanvasWrapper');
+  if (!wr) return;
+  let guide = document.getElementById('edAlignGuide');
+  if (edAlignMode === 'none') { if (guide) guide.style.display='none'; return; }
+  if (!guide) {
+    guide = document.createElement('div');
+    guide.id = 'edAlignGuide'; guide.className = 'ed-align-guide';
+    const label = document.createElement('div'); label.className='ed-align-guide-label'; label.id='edAlignGuideLabel';
+    const drag = document.createElement('div'); drag.className='ed-align-guide-drag'; drag.title='드래그하여 열 위치 조정';
+    guide.appendChild(label); guide.appendChild(drag);
+    wr.appendChild(guide);
+    // 드래그로 열 위치 조정
+    drag.addEventListener('mousedown', ev => {
+      ev.preventDefault(); ev.stopPropagation();
+      const startX = ev.clientX, startAlignX = edAlignX;
+      const move = mv => {
+        const dx = (mv.clientX - startX) / (edImgNW * edZoom) * 100;
+        edAlignX = Math.max(0, Math.min(95, startAlignX + dx));
+        edUpdateAlignGuide();
+      };
+      const up = () => { window.removeEventListener('mousemove',move); window.removeEventListener('mouseup',up); };
+      window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+    });
+  }
+  guide.style.display = '';
+  const boxW = (90/edImgNW)*100;
+  const xPct = edAlignMode === 'right' ? edAlignX - boxW : edAlignX;
+  guide.style.left = xPct + '%';
+  const lbl = document.getElementById('edAlignGuideLabel');
+  if (lbl) lbl.textContent = edAlignMode === 'left' ? '← 왼쪽 열' : '오른쪽 열 →';
+}
+
+// ── 대각선 핸들 드래그 ──
+function initDiagHandle() {
+  const svg = document.getElementById('edDiagSvg');
+  const dot = document.getElementById('edDiagEndDot');
+  const line = document.getElementById('edDiagLine');
+  if (!dot || !svg) return;
+  const CX = 45, CY = 45; // 중심점
+  dot.addEventListener('mousedown', ev => {
+    ev.preventDefault(); ev.stopPropagation();
+    const svgRect = svg.getBoundingClientRect();
+    const move = mv => {
+      const rx = mv.clientX - svgRect.left - CX;
+      const ry = mv.clientY - svgRect.top  - CY;
+      const len = Math.sqrt(rx*rx+ry*ry) || 1;
+      const NR = Math.min(Math.max(len, 15), 42); // 최소/최대 반경
+      const nx = CX + rx/len*NR, ny = CY + ry/len*NR;
+      dot.setAttribute('cx', nx); dot.setAttribute('cy', ny);
+      line.setAttribute('x2', nx); line.setAttribute('y2', ny);
+      // 픽셀→% 변환 (90px SVG → 이미지 비율)
+      edDiagDX = (rx/len*NR - 0) / 90 * 30;  // -15~15% 범위
+      edDiagDY = (ry/len*NR - 0) / 90 * 30;
+      edUpdateDiagLabel();
+    };
+    const up = () => { window.removeEventListener('mousemove',move); window.removeEventListener('mouseup',up); };
+    window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+  });
+  edUpdateDiagLabel();
+}
+
 // ── 건물 목록 채우기 ──
 function edPopulateBuildings(rows) {
   const bCol = sheetHeaders.find(h => h === '건물명' || h === '상가명') || '';
@@ -806,7 +957,13 @@ function edHandleImage(input) {
   document.getElementById('edZoomBar').style.display = '';
   const img = document.getElementById('ed-floorplan-img');
   img.src = edImageURL;
-  img.onload = () => { edImgNW = img.naturalWidth; edImgNH = img.naturalHeight; edApplyZoom(); edRenderAllBoxes(); };
+  img.onload = () => {
+    edImgNW = img.naturalWidth; edImgNH = img.naturalHeight;
+    edApplyZoom(); edRenderAllBoxes();
+    edUpdateAlignGuide();
+    initDiagHandle();
+    _diagBasePlaced = null;
+  };
   document.getElementById('edCanvasWrapper').addEventListener('click', edOnCanvasClick);
 }
 
@@ -846,23 +1003,32 @@ function edSelectUnit(u) {
 // ── 캔버스 클릭 → 박스 배치 ──
 function edOnCanvasClick(e) {
   if (!edSelectedUnit) return;
-  if (e.target.closest('.obox')) return;
+  if (e.target.closest('.obox') || e.target.closest('.ed-align-guide')) return;
   const wr = document.getElementById('edCanvasWrapper').getBoundingClientRect();
   const px = (e.clientX-wr.left)/edZoom, py = (e.clientY-wr.top)/edZoom;
-  // 대각선 배치: 이전 박스 기준으로 오프셋
-  const prevBoxes = Object.values(edBoxes);
+  const boxW = (90/edImgNW)*100, boxH = (34/edImgNH)*100;
   let bx = (px/edImgNW)*100, by = (py/edImgNH)*100;
-  if (prevBoxes.length > 0) {
-    // 마지막으로 놓은 박스에서 대각선 오프셋 적용
-    const last = prevBoxes[prevBoxes.length-1];
-    const diagOffX = (70/edImgNW)*100, diagOffY = (30/edImgNH)*100;
-    // 클릭 위치가 마지막 박스와 매우 가깝다면 대각선 이동
-    if (Math.abs(bx-last.x)<5 && Math.abs(by-last.y)<5) {
-      bx = last.x + diagOffX; by = last.y + diagOffY;
-    }
+
+  // ① 대각선 자동 배치: 이전 기준박스에서 edDiagDX/DY 오프셋
+  if (edDiagMode && _diagBasePlaced) {
+    bx = _diagBasePlaced.x + edDiagDX;
+    by = _diagBasePlaced.y + edDiagDY;
   }
-  bx = Math.max(0, Math.min(95, bx)); by = Math.max(0, Math.min(95, by));
-  edBoxes[edSelectedUnit.호수] = { x:bx, y:by, w:(90/edImgNW)*100, h:(34/edImgNH)*100, name:edSelectedUnit.상호명, unit:edSelectedUnit };
+
+  // ② 열 정렬 스냅 적용 (대각선 X는 열 정렬이 덮어씀)
+  if (edAlignMode === 'left') {
+    bx = edAlignX;                  // 왼쪽 열: 박스 left edge 고정
+  } else if (edAlignMode === 'right') {
+    bx = edAlignX - boxW;           // 오른쪽 열: 박스 right edge 고정
+  }
+
+  bx = Math.max(0, Math.min(98 - boxW, bx));
+  by = Math.max(0, Math.min(98 - boxH, by));
+
+  edBoxes[edSelectedUnit.호수] = { x:bx, y:by, w:boxW, h:boxH, name:edSelectedUnit.상호명, unit:edSelectedUnit };
+  // 다음 대각선 기준점 저장
+  _diagBasePlaced = { x:bx, y:by };
+
   edRenderAllBoxes(); edRenderUnitList();
   const all = edActiveDong==='전체'?edUnits:edUnits.filter(u=>u.동===edActiveDong);
   const idx = all.findIndex(u=>u.호수===edSelectedUnit.호수);
