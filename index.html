@@ -213,11 +213,16 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 .ed-zoom-btn:hover{background:var(--paper);color:var(--blue)}
 .ed-zoom-val{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text2);padding:3px 4px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);width:100%;text-align:center}
 
-/* 열 정렬 가이드라인 */
-.ed-align-guide{position:absolute;top:0;bottom:0;width:0;pointer-events:none;z-index:35}
-.ed-align-guide::before{content:'';position:absolute;top:0;bottom:0;left:0;width:2px;background:rgba(37,99,235,.55);border-left:2px dashed #2563eb}
-.ed-align-guide-label{position:absolute;top:6px;left:4px;background:#2563eb;color:#fff;font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;white-space:nowrap;font-family:'IBM Plex Mono',monospace}
-.ed-align-guide-drag{position:absolute;bottom:12px;left:-8px;width:18px;height:18px;background:#2563eb;border:2px solid #fff;border-radius:50%;cursor:ew-resize;z-index:36;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+/* 열 정렬 가이드라인 — 드래그 가능한 실선 형태 */
+.ed-align-guide{position:absolute;top:0;bottom:0;width:20px;margin-left:-10px;pointer-events:auto;cursor:ew-resize;z-index:35;touch-action:none;user-select:none;display:none}
+.ed-align-guide.visible{display:block}
+.ed-align-guide-line{position:absolute;top:0;bottom:0;left:50%;width:2px;margin-left:-1px;pointer-events:none;
+  background:repeating-linear-gradient(to bottom,#2563eb 0,#2563eb 8px,transparent 8px,transparent 14px);opacity:1;transition:opacity .2s}
+.ed-align-guide.snap-off .ed-align-guide-line{opacity:.32;background:repeating-linear-gradient(to bottom,#94a3b8 0,#94a3b8 4px,transparent 4px,transparent 10px)}
+.ed-align-guide-label{position:absolute;top:8px;left:50%;transform:translateX(-50%);background:#2563eb;color:#fff;font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;white-space:nowrap;pointer-events:none;transition:background .15s}
+.ed-align-guide.snap-off .ed-align-guide-label{background:#94a3b8}
+.ed-align-snap-btn{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:22px;height:22px;background:#2563eb;color:#fff;border:2.5px solid #fff;border-radius:50%;font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:37;box-shadow:0 2px 6px rgba(37,99,235,.4);pointer-events:auto;transition:background .15s;line-height:1}
+.ed-align-guide.snap-off .ed-align-snap-btn{background:#94a3b8;box-shadow:0 2px 6px rgba(0,0,0,.2)}
 
 /* 대각선 방향 핸들 위젯 */
 .ed-diag-widget{position:absolute;bottom:68px;right:20px;background:var(--paper2);border:1.5px solid var(--line);border-radius:10px;padding:8px 8px 6px;box-shadow:var(--shadow);z-index:50;display:none}
@@ -671,40 +676,62 @@ function buildFloorplanView(bName, fp) {
   const wrap = document.createElement('div'); wrap.className='card-floorplan-wrap';
   const cvs = document.createElement('canvas'); cvs.className='card-floorplan-canvas';
   const boxCount = Object.keys(fp.boxes).length;
-  wrap.innerHTML = '';
   wrap.appendChild(cvs);
   const info = document.createElement('div'); info.className='card-floorplan-info';
-  info.textContent = `${fp.dong||''} ${fp.floor||''} • 배치 ${boxCount}개`;
+  info.textContent = `${fp.dong||''} ${fp.floor||''} \u2022 \ubc30\uce58 ${boxCount}\uac1c \u2014 \ud074\ub9ad\ud558\uba74 \ud3b8\uc9d1`;
   wrap.appendChild(info);
-  // 캔버스에 평면도 렌더
+
   const img = new Image();
   img.onload = () => {
-    const W = cvs.offsetWidth || 290, ratio = img.naturalHeight/img.naturalWidth;
-    cvs.width = W * 2; cvs.height = Math.round(W * 2 * ratio);
-    cvs.style.height = Math.round(W * ratio) + 'px';
+    // DPR \uace0\ub824 \uc120\uba85\ud55c \ub80c더
+    const dpr = window.devicePixelRatio || 1;
+    const displayW = cvs.offsetWidth || 290;
+    const ratio = img.naturalHeight / img.naturalWidth;
+    const displayH = Math.round(displayW * ratio);
+
+    // canvas \ud06c\uae30 = \ud654\uba74 \ud45c\uc2dc \ud06c\uae30 \xd7 DPR (\uc120\uba85)
+    cvs.width  = Math.round(displayW * dpr);
+    cvs.height = Math.round(displayH * dpr);
+    cvs.style.height = displayH + 'px';
+
     const ctx = cvs.getContext('2d');
-    ctx.drawImage(img, 0, 0, cvs.width, cvs.height);
-    for (const [hosu,b] of Object.entries(fp.boxes)) {
-      const x=b.x/100*cvs.width, y=b.y/100*cvs.height, w=b.w/100*cvs.width, h=b.h/100*cvs.height;
-      // 박스 배경
-      ctx.fillStyle='rgba(37,99,235,.18)'; ctx.strokeStyle='#2563eb';
-      ctx.lineWidth=Math.max(1,cvs.width/600);
-      ctx.beginPath(); ctx.rect(x,y,w,h); ctx.fill(); ctx.stroke();
-      // 호수
-      const fs1=Math.max(7,h*.25); ctx.fillStyle='#2563eb';
-      ctx.font=`600 ${fs1}px "IBM Plex Mono",monospace`; ctx.fillText(hosu,x+2,y+fs1+1);
-      // 상호명
-      const fs2=Math.max(8,h*.4); ctx.fillStyle='#1a1c2a';
-      ctx.font=`700 ${fs2}px "Noto Sans KR",sans-serif`;
-      ctx.save(); ctx.rect(x+1,y,w-2,h); ctx.clip();
-      ctx.fillText(b.name||hosu, x+2, y+h*.85); ctx.restore();
+    ctx.scale(dpr, dpr); // DPR \uc2a4\ucf00\uc77c \uc801\uc6a9
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    // \uc6d0\ubcf8 \uc774\ubbf8\uc9c0 \ub4dc\ub85c\uc6b0 (displayW x displayH \ud06c\uae30\ub85c)
+    ctx.drawImage(img, 0, 0, displayW, displayH);
+
+    // \ubc15\uc2a4 \ub80c더
+    for (const [hosu, b] of Object.entries(fp.boxes)) {
+      const x = b.x/100 * displayW, y = b.y/100 * displayH;
+      const w = b.w/100 * displayW, h = b.h/100 * displayH;
+
+      // \ubc15\uc2a4 \ubc30\uacbd (\ubc18\ud22c\uba85)
+      ctx.fillStyle = 'rgba(37,99,235,.18)';
+      ctx.strokeStyle = '#2563eb';
+      ctx.lineWidth = Math.max(0.8, displayW / 600);
+      ctx.beginPath(); ctx.rect(x, y, w, h); ctx.fill(); ctx.stroke();
+
+      // \ud638\uc218 (\uc88c\uc0c1\ub2e8)
+      const fs1 = Math.max(6, h * 0.26);
+      ctx.fillStyle = '#2563eb';
+      ctx.font = `600 ${fs1}px "IBM Plex Mono",monospace`;
+      ctx.fillText(hosu, x + 2, y + fs1 + 1);
+
+      // \uc0c1\ud638\uba85 (\uc911\uc559)
+      const fs2 = Math.max(7, h * 0.42);
+      ctx.fillStyle = '#1a1c2a';
+      ctx.font = `700 ${fs2}px "Noto Sans KR",sans-serif`;
+      ctx.save(); ctx.beginPath(); ctx.rect(x+1, y, w-2, h); ctx.clip();
+      ctx.fillText(b.name || hosu, x + 3, y + h * 0.82);
+      ctx.restore();
     }
   };
   img.src = fp.imgDataURL;
-  // 클릭 시 편집기로 이동
-  cvs.title = '클릭하면 편집기로 이동';
+
+  cvs.title = '\uc9c0\ub3c4\uc5d0 \uc800\uc7a5\ub41c \ud3c9\uba74\ub3c4\uc785\ub2c8\ub2e4 (\ud074\ub9ad\ud558\uba74 \ud3b8\uc9d1)';
   cvs.addEventListener('click', () => {
-    document.getElementById('edBuildingSelect').value = bName;
     edLoadBuildingByName(bName);
     switchPage('editor');
   });
@@ -797,21 +824,34 @@ let edZoom = 1.0;
 let edActiveDong = '전체';
 let edDragging = null, edResizing = null;
 
-// ── 열 정렬 상태 ──
+// 열 정렬 상태 — edAlignSnap: 가이드는 보이되 스냅만 OFF
 let edAlignMode = 'none';   // 'none' | 'left' | 'right'
-let edAlignX   = 8;         // 정렬 기준 X (% of image, 기본 8%)
+let edAlignX   = 8;         // 정렬 기준 X (% of image)
+let edAlignSnap = true;     // TRUE: 스냅 적용 / FALSE: 가이드만 표시
 
 // ── 대각선 방향 상태 ──
-let edDiagMode = false;     // 자동 대각선 ON/OFF
+let edDiagMode = false;     // 대각선 모드 ON/OFF
 let edDiagDX   = 8;         // X 오프셋 (%)
 let edDiagDY   = 6;         // Y 오프셋 (%)
-let _diagBasePlaced = null; // 대각선 기준 박스 위치
+let _diagBasePlaced = null; // 대각선 기준 박스 위치 (첫 클릭 후 설정)
 
 function edSetAlign(mode) {
+  // 활성중인 열정렬 뺄튼 재클릭 → 스냅 ON/OFF 토글
+  if (edAlignMode === mode && mode !== 'none') {
+    edAlignSnap = !edAlignSnap;
+    edUpdateAlignGuide();
+    showToast(edAlignSnap ? '\uD83D\uDD12 \uc5f4 \uc2a4\ub0c5 ON' : '\uD83D\uDD13 \uc5f4 \uc2a4\ub0c5 OFF (\uac00\uc774\ub4dc\ub9cc)');
+    return;
+  }
   edAlignMode = mode;
+  if (mode !== 'none') edAlignSnap = true; // 모드 변경 시 스냅 자동 ON
   ['None','Left','Right'].forEach(k => {
-    const el = document.getElementById('edAlign'+k);
-    if (el) el.classList.toggle('active', 'edAlign'+k === 'edAlign'+mode.charAt(0).toUpperCase()+mode.slice(1) || (mode==='none'&&k==='None'));
+    const el = document.getElementById('edAlign' + k);
+    if (el) el.classList.toggle('active',
+      (mode === 'none' && k === 'None') ||
+      (mode === 'left' && k === 'Left') ||
+      (mode === 'right' && k === 'Right')
+    );
   });
   edUpdateAlignGuide();
 }
@@ -835,16 +875,47 @@ function edUpdateAlignGuide() {
   const wr = document.getElementById('edCanvasWrapper');
   if (!wr) return;
   let guide = document.getElementById('edAlignGuide');
-  if (edAlignMode === 'none') { if (guide) guide.style.display='none'; return; }
+
+  if (edAlignMode === 'none') {
+    if (guide) guide.classList.remove('visible');
+    return;
+  }
+
+  // 가이드 최초 생성
   if (!guide) {
     guide = document.createElement('div');
-    guide.id = 'edAlignGuide'; guide.className = 'ed-align-guide';
-    const label = document.createElement('div'); label.className='ed-align-guide-label'; label.id='edAlignGuideLabel';
-    const drag = document.createElement('div'); drag.className='ed-align-guide-drag'; drag.title='드래그하여 열 위치 조정';
-    guide.appendChild(label); guide.appendChild(drag);
+    guide.id = 'edAlignGuide';
+    guide.className = 'ed-align-guide';
+
+    // 실선용 div (pointer-events 없음, 비주얼만)
+    const line = document.createElement('div'); line.className = 'ed-align-guide-line';
+    guide.appendChild(line);
+
+    // 레이블
+    const label = document.createElement('div'); label.className = 'ed-align-guide-label'; label.id = 'edAlignGuideLabel';
+    guide.appendChild(label);
+
+    // 스냅 토글 버튼 (하늘 자물식)
+    const snapBtn = document.createElement('div');
+    snapBtn.className = 'ed-align-snap-btn'; snapBtn.id = 'edAlignSnapBtn';
+    snapBtn.title = '클릭: 스냅 ON/OFF';
+    snapBtn.textContent = '\uD83D\uDD12';
+    guide.appendChild(snapBtn);
+
     wr.appendChild(guide);
-    // 드래그로 열 위치 조정
-    drag.addEventListener('mousedown', ev => {
+
+    // 스냅 토글
+    snapBtn.addEventListener('click', ev => {
+      ev.stopPropagation();
+      edAlignSnap = !edAlignSnap;
+      guide.classList.toggle('snap-off', !edAlignSnap);
+      snapBtn.textContent = edAlignSnap ? '\uD83D\uDD12' : '\uD83D\uDD13';
+      showToast(edAlignSnap ? '\uD83D\uDD12 \uc5f4 \uc2a4\ub0c5 ON' : '\uD83D\uDD13 \uac00\uc774\ub4dc\ub9cc (\uc2a4\ub0c5 OFF)');
+    });
+
+    // 가이드 선 전체 드래그 → 위치 이동
+    guide.addEventListener('mousedown', ev => {
+      if (ev.target.closest('.ed-align-snap-btn')) return;
       ev.preventDefault(); ev.stopPropagation();
       const startX = ev.clientX, startAlignX = edAlignX;
       const move = mv => {
@@ -852,16 +923,23 @@ function edUpdateAlignGuide() {
         edAlignX = Math.max(0, Math.min(95, startAlignX + dx));
         edUpdateAlignGuide();
       };
-      const up = () => { window.removeEventListener('mousemove',move); window.removeEventListener('mouseup',up); };
-      window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+      const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+      window.addEventListener('mousemove', move);
+      window.addEventListener('mouseup', up);
     });
   }
-  guide.style.display = '';
-  const boxW = (90/edImgNW)*100;
+
+  guide.classList.add('visible');
+  guide.classList.toggle('snap-off', !edAlignSnap);
+
+  const boxW = edImgNW ? (90 / edImgNW) * 100 : 8;
   const xPct = edAlignMode === 'right' ? edAlignX - boxW : edAlignX;
   guide.style.left = xPct + '%';
+
   const lbl = document.getElementById('edAlignGuideLabel');
-  if (lbl) lbl.textContent = edAlignMode === 'left' ? '← 왼쪽 열' : '오른쪽 열 →';
+  if (lbl) lbl.textContent = (edAlignMode === 'left' ? '\u2190 L' : 'R \u2192') + (edAlignSnap ? '' : ' [OFF]');
+  const sb = document.getElementById('edAlignSnapBtn');
+  if (sb) sb.textContent = edAlignSnap ? '\uD83D\uDD12' : '\uD83D\uDD13';
 }
 
 // ── 대각선 핸들 드래그 ──
@@ -1005,35 +1083,40 @@ function edOnCanvasClick(e) {
   if (!edSelectedUnit) return;
   if (e.target.closest('.obox') || e.target.closest('.ed-align-guide')) return;
   const wr = document.getElementById('edCanvasWrapper').getBoundingClientRect();
-  const px = (e.clientX-wr.left)/edZoom, py = (e.clientY-wr.top)/edZoom;
-  const boxW = (90/edImgNW)*100, boxH = (34/edImgNH)*100;
-  let bx = (px/edImgNW)*100, by = (py/edImgNH)*100;
+  const px = (e.clientX - wr.left) / edZoom, py = (e.clientY - wr.top) / edZoom;
+  const boxW = (90 / edImgNW) * 100, boxH = (34 / edImgNH) * 100;
+  let bx = (px / edImgNW) * 100, by = (py / edImgNH) * 100;
 
-  // ① 대각선 자동 배치: 이전 기준박스에서 edDiagDX/DY 오프셋
-  if (edDiagMode && _diagBasePlaced) {
-    bx = _diagBasePlaced.x + edDiagDX;
-    by = _diagBasePlaced.y + edDiagDY;
+  // ① 대각선 모드: 첫 클릭은 클릭 위치, 이후는 이전 박스 + 오프셋
+  if (edDiagMode) {
+    if (_diagBasePlaced) {
+      // 이전 박스 기준으로 대각선 오프셋 (클릭 위치 무시)
+      bx = _diagBasePlaced.x + edDiagDX;
+      by = _diagBasePlaced.y + edDiagDY;
+    }
+    // ≡ else: 첫 클릭은 클릭한 곳에 배치 (bx, by 유지)
   }
 
-  // ② 열 정렬 스냅 적용 (대각선 X는 열 정렬이 덮어씀)
-  if (edAlignMode === 'left') {
-    bx = edAlignX;                  // 왼쪽 열: 박스 left edge 고정
-  } else if (edAlignMode === 'right') {
-    bx = edAlignX - boxW;           // 오른쪽 열: 박스 right edge 고정
+  // ② 열 정렬 스냅 (edAlignSnap ON 일 때만 적용)
+  if (edAlignSnap) {
+    if (edAlignMode === 'left') {
+      bx = edAlignX;           // 왼쪽 열: left edge 고정
+    } else if (edAlignMode === 'right') {
+      bx = edAlignX - boxW;    // 오른쪽 열: right edge 고정
+    }
   }
 
   bx = Math.max(0, Math.min(98 - boxW, bx));
   by = Math.max(0, Math.min(98 - boxH, by));
 
-  edBoxes[edSelectedUnit.호수] = { x:bx, y:by, w:boxW, h:boxH, name:edSelectedUnit.상호명, unit:edSelectedUnit };
-  // 다음 대각선 기준점 저장
-  _diagBasePlaced = { x:bx, y:by };
+  edBoxes[edSelectedUnit.호수] = { x: bx, y: by, w: boxW, h: boxH, name: edSelectedUnit.상호명, unit: edSelectedUnit };
+  _diagBasePlaced = { x: bx, y: by }; // 대각선 기준점 업데이트
 
   edRenderAllBoxes(); edRenderUnitList();
-  const all = edActiveDong==='전체'?edUnits:edUnits.filter(u=>u.동===edActiveDong);
-  const idx = all.findIndex(u=>u.호수===edSelectedUnit.호수);
-  const next = all.slice(idx+1).find(u=>!edBoxes[u.호수]);
-  if (next) edSelectUnit(next); else { edSelectedUnit=null; edRenderUnitList(); }
+  const all = edActiveDong === '전체' ? edUnits : edUnits.filter(u => u.동 === edActiveDong);
+  const idx = all.findIndex(u => u.호수 === edSelectedUnit.호수);
+  const next = all.slice(idx + 1).find(u => !edBoxes[u.호수]);
+  if (next) edSelectUnit(next); else { edSelectedUnit = null; edRenderUnitList(); }
 }
 
 // ── 박스 렌더 ──
@@ -1090,42 +1173,77 @@ function edClearBuildingBoxes(){
   showToast(`✅ ${bName} 초기화 완료`);
 }
 
-// 지도에 저장 (평면도 data를 localStorage에 보존, 이미지는 dataURL로)
+// 지도에 저장 — 원본 화질 그대로 유지
 function edSaveToMap(){
   const bName = document.getElementById('edBuildingSelect').value;
   if(!bName){showToast('건물을 먼저 선택하세요');return;}
   if(!Object.keys(edBoxes).length){showToast('배치된 호수가 없습니다');return;}
   if(!edImageURL){showToast('평면도 이미지를 업로드하세요');return;}
 
-  // 이미지를 dataURL로 변환 후 저장
-  const img = document.getElementById('ed-floorplan-img');
-  const cvs = document.createElement('canvas');
-  // 저장 크기 제한 (너무 크면 localStorage 초과)
-  const MAX = 1200;
-  const scale = Math.min(1, MAX/img.naturalWidth, MAX/img.naturalHeight);
-  cvs.width = Math.round(img.naturalWidth*scale);
-  cvs.height = Math.round(img.naturalHeight*scale);
-  const ctx = cvs.getContext('2d');
-  ctx.drawImage(img,0,0,cvs.width,cvs.height);
-  const dataURL = cvs.toDataURL('image/jpeg',0.82);
-
   const state = cardStates['card_'+btoa(encodeURIComponent(bName)).replace(/[^a-zA-Z0-9]/g,'_')] || {};
-  floorplans[bName] = {
-    boxes: Object.fromEntries(Object.entries(edBoxes).map(([k,v])=>[k,{x:v.x,y:v.y,w:v.w,h:v.h,name:v.unit?.상호명||''}])),
-    dong: state.section||'',
-    floor: state.floor||'',
-    imgDataURL: dataURL,
-    savedAt: new Date().toISOString()
-  };
-  try {
-    localStorage.setItem(FLOORPLAN_KEY, JSON.stringify(floorplans));
-    showToast(`✅ '${bName}' 평면도 전체지도에 반영 완료`);
-    // 전체지도 해당 카드 갱신
-    const cid = 'card_'+btoa(encodeURIComponent(bName)).replace(/[^a-zA-Z0-9]/g,'_');
-    rebuildCard(cid, bName);
-  } catch(e) {
-    showToast('❌ 저장 실패 (이미지가 너무 큽니다)');
+  const boxData = Object.fromEntries(Object.entries(edBoxes).map(([k,v])=>[k,{x:v.x,y:v.y,w:v.w,h:v.h,name:v.unit?.\uc0c1\ud638\uba85||''}]));
+
+  // 원본 파일에서 직접 dataURL 읽어 화질 손실 제로
+  const edInput = document.getElementById('edImgInput');
+  const file = edInput?.files?.[0];
+  
+  function doSave(imgDataURL) {
+    floorplans[bName] = {
+      boxes: boxData,
+      dong: state.section||'',
+      floor: state.floor||'',
+      imgDataURL,
+      savedAt: new Date().toISOString()
+    };
+    try {
+      localStorage.setItem(FLOORPLAN_KEY, JSON.stringify(floorplans));
+      showToast(`\u2705 '${bName}' \ud3c9\uba74\ub3c4 \uc800\uc7a5 \uc644\ub8cc`);
+      const cid = 'card_'+btoa(encodeURIComponent(bName)).replace(/[^a-zA-Z0-9]/g,'_');
+      rebuildCard(cid, bName);
+    } catch(e) {
+      // localStorage \uc6a9\ub7c9 \ucd08\uacfc \uc2dc: \ub2e8\uacc4\uc801 \ud488\uc9c8 \uc800\ud558
+      tryCompressedSave(imgDataURL, bName, boxData, state);
+    }
   }
+
+  if (file) {
+    // 원본 파일이 있으면 FileReader로 직접 읽기 (화질 손실 없음)
+    const reader = new FileReader();
+    reader.onload = e => doSave(e.target.result);
+    reader.readAsDataURL(file);
+  } else {
+    // 파일이 없으면 (reloaded from blob) canvas로 저장
+    const img = document.getElementById('ed-floorplan-img');
+    const cvs = document.createElement('canvas');
+    cvs.width = img.naturalWidth; cvs.height = img.naturalHeight;
+    cvs.getContext('2d').drawImage(img, 0, 0);
+    // WebP 지원시 WebP(무손실에 가까운), 미지원시 PNG
+    const supportsWebP = cvs.toDataURL('image/webp').startsWith('data:image/webp');
+    doSave(supportsWebP ? cvs.toDataURL('image/webp', 0.95) : cvs.toDataURL('image/png'));
+  }
+}
+
+function tryCompressedSave(originalURL, bName, boxData, state) {
+  const img2 = new Image();
+  img2.onload = () => {
+    const steps = [
+      { max: 2400, q: 0.90 },
+      { max: 1800, q: 0.85 },
+      { max: 1200, q: 0.80 },
+      { max: 800,  q: 0.72 },
+    ];
+    for (const {max, q} of steps) {
+      const sc = Math.min(1, max/img2.naturalWidth, max/img2.naturalHeight);
+      const c = document.createElement('canvas');
+      c.width = Math.round(img2.naturalWidth*sc); c.height = Math.round(img2.naturalHeight*sc);
+      c.getContext('2d').drawImage(img2, 0, 0, c.width, c.height);
+      const url = c.toDataURL('image/jpeg', q);
+      floorplans[bName] = { boxes:boxData, dong:state.section||'', floor:state.floor||'', imgDataURL:url, savedAt:new Date().toISOString() };
+      try { localStorage.setItem(FLOORPLAN_KEY, JSON.stringify(floorplans)); showToast(`\u2705 \uc800\uc7a5 \uc644\ub8cc (${Math.round(sc*100)}% \ud06c\uae30)`); const cid='card_'+btoa(encodeURIComponent(bName)).replace(/[^a-zA-Z0-9]/g,'_'); rebuildCard(cid,bName); return; } catch(e){}
+    }
+    showToast('\u274c \uc800\uc7a5 \uc2e4\ud328 (\uc0ac\uc6a9 \uac00\ub2a5\ud55c \uacf5\uac04 \ubd80\uc871)');
+  };
+  img2.src = originalURL;
 }
 
 // ── Export Image ──
