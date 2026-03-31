@@ -79,7 +79,12 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 .floor-tab.active{background:var(--blue);color:#fff;border-color:var(--blue);font-weight:700}
 
 .room-grid-wrap{overflow-y:auto;max-height:280px;padding:8px 10px 10px}
-.room-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:5px}
+.room-grid{display:flex;flex-wrap:wrap;gap:5px}
+.room-grid .room-cell{flex:0 0 calc(25% - 4px);min-width:58px;max-width:72px}
+/* 검색 매칭 셀 앞 정렬용 (order 속성은 flex에서만 동작) */
+.room-grid.search-active .room-cell:not(.highlight){order:2;opacity:.42}
+.room-grid.search-active .room-cell.highlight{order:1}
+
 .room-cell{border-radius:6px;padding:5px 4px;text-align:center;cursor:pointer;border:1.5px solid var(--line);background:var(--paper);transition:transform .1s,box-shadow .1s}
 .room-cell:hover{transform:translateY(-1px);box-shadow:0 3px 10px rgba(0,0,0,.1);border-color:var(--blue-mid)}
 .room-cell.occupied{background:var(--green-light);border-color:#86efac}
@@ -171,6 +176,11 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 .ed-sidebar-foot{padding:10px 12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
 .ed-hint{font-size:11px;color:var(--text2);line-height:1.5;padding:8px 10px;background:var(--blue-light);border-radius:6px;border-left:3px solid var(--blue)}
 .placed-pill{font-family:'IBM Plex Mono',monospace;font-size:11px;background:var(--blue-light);color:var(--blue);padding:2px 8px;border-radius:8px;font-weight:700}
+
+/* 전체지도 카드 내 평면도 캔버스 */
+.card-floorplan-wrap{overflow:hidden;padding:6px 8px 0;background:var(--paper2)}
+.card-floorplan-canvas{width:100%;border-radius:6px;border:1px solid var(--line);background:#f8f9fe;display:block;cursor:pointer}
+.card-floorplan-info{font-size:9px;color:var(--text3);padding:3px 8px 6px;text-align:right}
 
 /* Editor Canvas */
 .ed-canvas-area{flex:1;overflow:auto;background:#e8eaf0;background-image:radial-gradient(circle,#c8cde0 1px,transparent 1px);background-size:20px 20px;position:relative}
@@ -329,11 +339,15 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
       <div class="ed-sidebar-foot">
         <div class="ed-hint">목록에서 호수 선택 후 평면도를 클릭해 위치 지정</div>
         <div style="display:flex;gap:6px">
+          <button class="btn" style="flex:1;font-size:11px" onclick="edClearBuildingBoxes()">🏢 이 건물 초기화</button>
           <button class="btn" style="flex:1;font-size:11px" onclick="edClearAllBoxes()">전체 초기화</button>
-          <button class="btn primary" style="flex:1;font-size:11px" onclick="edExportImg()">📷 이미지 저장</button>
         </div>
         <div style="display:flex;gap:6px">
-          <button class="btn" style="flex:1;font-size:11px" onclick="edSaveLayout()">💾 레이아웃 저장</button>
+          <button class="btn primary" style="flex:1;font-size:11px" onclick="edSaveToMap()">🗺️ 지도에 저장</button>
+          <button class="btn" style="flex:1;font-size:11px" onclick="edExportImg()">📷 이미지</button>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn" style="flex:1;font-size:11px" onclick="edSaveLayout()">💾 JSON 저장</button>
           <label class="btn" style="flex:1;font-size:11px;cursor:pointer;justify-content:center">
             📂 불러오기
             <input type="file" accept=".json" style="display:none" onchange="edLoadLayout(this)">
@@ -374,13 +388,15 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 // ═══════════════════════════════════════════════
 // COMMON STATE & CONFIG
 // ═══════════════════════════════════════════════
-const STORAGE_KEY = 'wirye_map_layout_v2';
+const STORAGE_KEY      = 'wirye_map_layout_v2';
+const FLOORPLAN_KEY    = 'wirye_floorplans_v1'; // 건물별 평면도 저장
 const SHEET_ID  = '19KWBXPiK-qXycopkNRHNMddmux2cKohtm7fLLyfiZGw';
 const SHEET_GID = '805020193';
 
 let buildings = {};   // { bName: { dong: { floor: [rooms] } } }
 let cardStates = {};
 let positions = {};
+let floorplans = {};  // { bName: { boxes:{}, dong, floor, imgDataURL } }
 let zoomScale = 1.0;
 let panOffset = { x: 80, y: 80 };
 let isPanning = false, panStart = { x: 0, y: 0 };
@@ -388,6 +404,15 @@ let isDraggingCard = false;
 let vacantOnly = false, searchQuery = '';
 let rawSheetRows = []; // 원본 시트 행 전체 보관
 let sheetHeaders = [];
+
+// 자동 저장 (디바운스)
+let _autoSaveTimer = null;
+function autoSavePositions() {
+  clearTimeout(_autoSaveTimer);
+  _autoSaveTimer = setTimeout(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(positions));
+  }, 800);
+}
 
 const FLOOR_ORDER = f => {
   if (f === '미지정') return 999;
@@ -509,8 +534,9 @@ function initMap() {
 
 function loadPositions() {
   try { const s = localStorage.getItem(STORAGE_KEY); if (s) positions = JSON.parse(s); } catch(e) { positions = {}; }
+  try { const f = localStorage.getItem(FLOORPLAN_KEY); if (f) floorplans = JSON.parse(f); } catch(e) { floorplans = {}; }
 }
-function savePositions() { localStorage.setItem(STORAGE_KEY, JSON.stringify(positions)); showToast('배치 저장 완료'); }
+function savePositions() { localStorage.setItem(STORAGE_KEY, JSON.stringify(positions)); showToast('✅ 배치 저장 완료'); }
 function getDefaultPosition(idx) { const c = idx % 3; const r = Math.floor(idx / 3); return { x: 40 + c*350, y: 40 + r*480 }; }
 
 function renderAllCards() {
@@ -556,12 +582,24 @@ function createCard(bName, cardId) {
 }
 
 function buildRoomGrid(cardId,bName) {
+  // 저장된 평면도가 있으면 해당 카드에 평면도 렌더
+  const fp = floorplans[bName];
+  if (fp && fp.boxes && fp.imgDataURL && !searchQuery && !vacantOnly) {
+    return buildFloorplanView(bName, fp);
+  }
+
   const state=cardStates[cardId], rooms=(buildings[bName][state.section]||{})[state.floor]||[];
   const wrap=document.createElement('div'); wrap.className='room-grid-wrap';
   let fr = vacantOnly ? rooms.filter(r=>isVacant(r)) : rooms;
-  if (searchQuery) fr=fr.filter(r=>matchSearch(r,searchQuery));
+  // 검색 시: 전체 보여주되 매칭 항목 앞으로
+  if (searchQuery) {
+    const matched = rooms.filter(r=>matchSearch(r,searchQuery));
+    const rest = rooms.filter(r=>!matchSearch(r,searchQuery));
+    fr = [...matched, ...rest];
+    if (!matched.length) { wrap.innerHTML=`<div class="room-grid-empty">검색 결과 없음</div>`; return wrap; }
+  }
   if (!fr.length) { wrap.innerHTML=`<div class="room-grid-empty">${rooms.length===0?'호실 데이터 없음':'검색 결과 없음'}</div>`; return wrap; }
-  const grid=document.createElement('div'); grid.className='room-grid';
+  const grid=document.createElement('div'); grid.className='room-grid'+(searchQuery?' search-active':'');
   fr.forEach(room => {
     const cell=document.createElement('div');
     cell.className='room-cell'+(isOccupied(room)?' occupied':isVacant(room)?' vacant':'');
@@ -571,6 +609,51 @@ function buildRoomGrid(cardId,bName) {
     grid.appendChild(cell);
   });
   wrap.appendChild(grid); return wrap;
+}
+
+// 전체지도 카드 내 평면도 미니 뷰
+function buildFloorplanView(bName, fp) {
+  const wrap = document.createElement('div'); wrap.className='card-floorplan-wrap';
+  const cvs = document.createElement('canvas'); cvs.className='card-floorplan-canvas';
+  const boxCount = Object.keys(fp.boxes).length;
+  wrap.innerHTML = '';
+  wrap.appendChild(cvs);
+  const info = document.createElement('div'); info.className='card-floorplan-info';
+  info.textContent = `${fp.dong||''} ${fp.floor||''} • 배치 ${boxCount}개`;
+  wrap.appendChild(info);
+  // 캔버스에 평면도 렌더
+  const img = new Image();
+  img.onload = () => {
+    const W = cvs.offsetWidth || 290, ratio = img.naturalHeight/img.naturalWidth;
+    cvs.width = W * 2; cvs.height = Math.round(W * 2 * ratio);
+    cvs.style.height = Math.round(W * ratio) + 'px';
+    const ctx = cvs.getContext('2d');
+    ctx.drawImage(img, 0, 0, cvs.width, cvs.height);
+    for (const [hosu,b] of Object.entries(fp.boxes)) {
+      const x=b.x/100*cvs.width, y=b.y/100*cvs.height, w=b.w/100*cvs.width, h=b.h/100*cvs.height;
+      // 박스 배경
+      ctx.fillStyle='rgba(37,99,235,.18)'; ctx.strokeStyle='#2563eb';
+      ctx.lineWidth=Math.max(1,cvs.width/600);
+      ctx.beginPath(); ctx.rect(x,y,w,h); ctx.fill(); ctx.stroke();
+      // 호수
+      const fs1=Math.max(7,h*.25); ctx.fillStyle='#2563eb';
+      ctx.font=`600 ${fs1}px "IBM Plex Mono",monospace`; ctx.fillText(hosu,x+2,y+fs1+1);
+      // 상호명
+      const fs2=Math.max(8,h*.4); ctx.fillStyle='#1a1c2a';
+      ctx.font=`700 ${fs2}px "Noto Sans KR",sans-serif`;
+      ctx.save(); ctx.rect(x+1,y,w-2,h); ctx.clip();
+      ctx.fillText(b.name||hosu, x+2, y+h*.85); ctx.restore();
+    }
+  };
+  img.src = fp.imgDataURL;
+  // 클릭 시 편집기로 이동
+  cvs.title = '클릭하면 편집기로 이동';
+  cvs.addEventListener('click', () => {
+    document.getElementById('edBuildingSelect').value = bName;
+    edLoadBuildingByName(bName);
+    switchPage('editor');
+  });
+  return wrap;
 }
 
 function buildFooterStats(bName,state) {
@@ -600,7 +683,7 @@ function setupCardDrag(card,cardId){
     const sL=positions[cardId].x,sT=positions[cardId].y;
     card.style.zIndex=100;card.classList.add('dragging');
     function onMove(e2){const x2=e2.touches?e2.touches[0].clientX:e2.clientX,y2=e2.touches?e2.touches[0].clientY:e2.clientY;positions[cardId].x=sL+(x2-cx)/zoomScale;positions[cardId].y=sT+(y2-cy)/zoomScale;card.style.left=positions[cardId].x+'px';card.style.top=positions[cardId].y+'px';}
-    function onUp(){isDraggingCard=false;card.style.zIndex=10;card.classList.remove('dragging');document.removeEventListener('mousemove',onMove);document.removeEventListener('mouseup',onUp);document.removeEventListener('touchmove',onMove);document.removeEventListener('touchend',onUp);}
+    function onUp(){isDraggingCard=false;card.style.zIndex=10;card.classList.remove('dragging');autoSavePositions();document.removeEventListener('mousemove',onMove);document.removeEventListener('mouseup',onUp);document.removeEventListener('touchmove',onMove);document.removeEventListener('touchend',onUp);}
     document.addEventListener('mousemove',onMove);document.addEventListener('mouseup',onUp);document.addEventListener('touchmove',onMove,{passive:false});document.addEventListener('touchend',onUp);
   }
   card.addEventListener('mousedown',onDown);card.addEventListener('touchstart',onDown,{passive:false});
@@ -687,11 +770,29 @@ function edLoadBuilding() {
   })).filter(u => u.호수);
 
   edActiveDong = '전체';
-  edBoxes = {};
+  // 저장된 평면도 박스 복원
+  const saved = floorplans[bName];
+  if (saved && saved.boxes) {
+    const uMap = Object.fromEntries(edUnits.map(u=>[u.호수,u]));
+    edBoxes = {};
+    for (const [hosu,b] of Object.entries(saved.boxes)) {
+      const unit = uMap[hosu]; if (unit) edBoxes[hosu]={...b,unit};
+    }
+    showToast(`✅ ${bName} — ${edUnits.length}개 호실 (저장 레이아웃 복원)`);
+  } else {
+    edBoxes = {};
+    showToast(`✅ ${bName} — ${edUnits.length}개 호실 로드`);
+  }
   edSelectedUnit = null;
   edRenderDongTabs();
   edRenderUnitList();
-  showToast(`✅ ${bName} — ${edUnits.length}개 호실 로드`);
+}
+
+// 전체지도 카드에서 건물명으로 직접 로드
+function edLoadBuildingByName(bName) {
+  const sel = document.getElementById('edBuildingSelect');
+  sel.value = bName;
+  edLoadBuilding();
 }
 
 // ── 이미지 업로드 ──
@@ -748,7 +849,20 @@ function edOnCanvasClick(e) {
   if (e.target.closest('.obox')) return;
   const wr = document.getElementById('edCanvasWrapper').getBoundingClientRect();
   const px = (e.clientX-wr.left)/edZoom, py = (e.clientY-wr.top)/edZoom;
-  edBoxes[edSelectedUnit.호수] = { x:(px/edImgNW)*100, y:(py/edImgNH)*100, w:(90/edImgNW)*100, h:(34/edImgNH)*100, unit:edSelectedUnit };
+  // 대각선 배치: 이전 박스 기준으로 오프셋
+  const prevBoxes = Object.values(edBoxes);
+  let bx = (px/edImgNW)*100, by = (py/edImgNH)*100;
+  if (prevBoxes.length > 0) {
+    // 마지막으로 놓은 박스에서 대각선 오프셋 적용
+    const last = prevBoxes[prevBoxes.length-1];
+    const diagOffX = (70/edImgNW)*100, diagOffY = (30/edImgNH)*100;
+    // 클릭 위치가 마지막 박스와 매우 가깝다면 대각선 이동
+    if (Math.abs(bx-last.x)<5 && Math.abs(by-last.y)<5) {
+      bx = last.x + diagOffX; by = last.y + diagOffY;
+    }
+  }
+  bx = Math.max(0, Math.min(95, bx)); by = Math.max(0, Math.min(95, by));
+  edBoxes[edSelectedUnit.호수] = { x:bx, y:by, w:(90/edImgNW)*100, h:(34/edImgNH)*100, name:edSelectedUnit.상호명, unit:edSelectedUnit };
   edRenderAllBoxes(); edRenderUnitList();
   const all = edActiveDong==='전체'?edUnits:edUnits.filter(u=>u.동===edActiveDong);
   const idx = all.findIndex(u=>u.호수===edSelectedUnit.호수);
@@ -794,7 +908,59 @@ function edStartResize(e) {
 // ── Zoom ──
 function edChangeZoom(d){edZoom=Math.max(.2,Math.min(5,edZoom+d));edApplyZoom();}
 function edApplyZoom(){const img=document.getElementById('ed-floorplan-img');img.style.width=(edImgNW*edZoom)+'px';img.style.height=(edImgNH*edZoom)+'px';document.getElementById('edZoomVal').textContent=Math.round(edZoom*100)+'%';}
-function edClearAllBoxes(){if(!confirm('모든 위치 정보를 초기화할까요?'))return;edBoxes={};edRenderAllBoxes();edRenderUnitList();}
+function edClearAllBoxes(){if(!confirm('모든 박스를 초기화할까요?'))return;edBoxes={};edRenderAllBoxes();edRenderUnitList();}
+
+// 이 건물 초기화 (현재 선택된 건물이름 기준)
+function edClearBuildingBoxes(){
+  const bName = document.getElementById('edBuildingSelect').value;
+  if(!bName){showToast('건물을 먼저 선택하세요');return;}
+  if(!confirm(`"${bName}" 의 배치를 초기화할까요?`))return;
+  edBoxes={};
+  // localStorage 평면도도 삭제
+  delete floorplans[bName];
+  localStorage.setItem(FLOORPLAN_KEY, JSON.stringify(floorplans));
+  edRenderAllBoxes();edRenderUnitList();
+  refreshAllCards();
+  showToast(`✅ ${bName} 초기화 완료`);
+}
+
+// 지도에 저장 (평면도 data를 localStorage에 보존, 이미지는 dataURL로)
+function edSaveToMap(){
+  const bName = document.getElementById('edBuildingSelect').value;
+  if(!bName){showToast('건물을 먼저 선택하세요');return;}
+  if(!Object.keys(edBoxes).length){showToast('배치된 호수가 없습니다');return;}
+  if(!edImageURL){showToast('평면도 이미지를 업로드하세요');return;}
+
+  // 이미지를 dataURL로 변환 후 저장
+  const img = document.getElementById('ed-floorplan-img');
+  const cvs = document.createElement('canvas');
+  // 저장 크기 제한 (너무 크면 localStorage 초과)
+  const MAX = 1200;
+  const scale = Math.min(1, MAX/img.naturalWidth, MAX/img.naturalHeight);
+  cvs.width = Math.round(img.naturalWidth*scale);
+  cvs.height = Math.round(img.naturalHeight*scale);
+  const ctx = cvs.getContext('2d');
+  ctx.drawImage(img,0,0,cvs.width,cvs.height);
+  const dataURL = cvs.toDataURL('image/jpeg',0.82);
+
+  const state = cardStates['card_'+btoa(encodeURIComponent(bName)).replace(/[^a-zA-Z0-9]/g,'_')] || {};
+  floorplans[bName] = {
+    boxes: Object.fromEntries(Object.entries(edBoxes).map(([k,v])=>[k,{x:v.x,y:v.y,w:v.w,h:v.h,name:v.unit?.상호명||''}])),
+    dong: state.section||'',
+    floor: state.floor||'',
+    imgDataURL: dataURL,
+    savedAt: new Date().toISOString()
+  };
+  try {
+    localStorage.setItem(FLOORPLAN_KEY, JSON.stringify(floorplans));
+    showToast(`✅ '${bName}' 평면도 전체지도에 반영 완료`);
+    // 전체지도 해당 카드 갱신
+    const cid = 'card_'+btoa(encodeURIComponent(bName)).replace(/[^a-zA-Z0-9]/g,'_');
+    rebuildCard(cid, bName);
+  } catch(e) {
+    showToast('❌ 저장 실패 (이미지가 너무 큽니다)');
+  }
+}
 
 // ── Export Image ──
 function edExportImg() {
@@ -816,12 +982,13 @@ function edExportImg() {
   img.src=edImageURL;
 }
 
-// ── Layout Save/Load ──
+// ── Layout Save/Load (JSON 파일) ──
 function edSaveLayout() {
   if(!Object.keys(edBoxes).length){showToast('배치된 호수가 없습니다');return;}
-  const data={version:2,savedAt:new Date().toISOString(),units:edUnits,boxes:Object.fromEntries(Object.entries(edBoxes).map(([k,v])=>[k,{x:v.x,y:v.y,w:v.w,h:v.h}]))};
+  const bName = document.getElementById('edBuildingSelect').value;
+  const data={version:2,savedAt:new Date().toISOString(),building:bName,units:edUnits,boxes:Object.fromEntries(Object.entries(edBoxes).map(([k,v])=>[k,{x:v.x,y:v.y,w:v.w,h:v.h,name:v.unit?.상호명||''}]))};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='평면도_레이아웃.json';a.click();showToast('✅ 레이아웃 저장 완료');
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${bName||'평면도'}_레이아웃.json`;a.click();showToast('✅ JSON 파일 저장 완료');
 }
 function edLoadLayout(input) {
   const file=input.files[0];if(!file)return;
