@@ -181,6 +181,12 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 .card-floorplan-wrap{overflow:hidden;padding:6px 8px 0;background:var(--paper2)}
 .card-floorplan-canvas{width:100%;border-radius:6px;border:1px solid var(--line);background:#f8f9fe;display:block;cursor:pointer}
 .card-floorplan-info{font-size:9px;color:var(--text3);padding:3px 8px 6px;text-align:right}
+/* 고화질 평면도 오버레이 */
+.card-fp-container{position:relative;width:100%;border-radius:6px;border:1px solid var(--line);overflow:hidden;background:#f8f9fe;cursor:pointer}
+.card-fp-container img{width:100%;display:block;image-rendering:auto}
+.card-fp-box{position:absolute;background:rgba(37,99,235,.15);border:1.5px solid #2563eb;border-radius:2px;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;pointer-events:none}
+.card-fp-box-hosu{font-family:'IBM Plex Mono',monospace;font-size:max(0.5vw,5px);font-weight:600;color:#2563eb;position:absolute;top:1px;left:2px;line-height:1}
+.card-fp-box-name{font-size:max(0.6vw,6px);font-weight:700;color:#1a1c2a;text-align:center;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;padding:0 2px}
 
 /* Editor Canvas */
 .ed-canvas-area{flex:1;overflow:auto;background:#e8eaf0;background-image:radial-gradient(circle,#c8cde0 1px,transparent 1px);background-size:20px 20px;position:relative}
@@ -227,13 +233,13 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 .ed-align-snap-btn{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:22px;height:22px;background:#2563eb;color:#fff;border:2.5px solid #fff;border-radius:50%;font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:37;box-shadow:0 2px 6px rgba(37,99,235,.4);pointer-events:auto;transition:background .15s;line-height:1}
 .ed-align-guide.snap-off .ed-align-snap-btn{background:#94a3b8;box-shadow:0 2px 6px rgba(0,0,0,.2)}
 
-/* 우측 정렬 가이드라인 */
-.ed-align-guide-right .ed-align-guide-line{background:repeating-linear-gradient(to bottom,#16a34a 0,#16a34a 8px,transparent 8px,transparent 14px)}
-.ed-align-guide-right .ed-align-guide-label{background:#16a34a}
-.ed-align-guide-right .ed-align-snap-btn{background:#16a34a;box-shadow:0 2px 6px rgba(22,163,74,.4)}
-.ed-align-guide-right.snap-off .ed-align-guide-line{opacity:.32;background:repeating-linear-gradient(to bottom,#94a3b8 0,#94a3b8 4px,transparent 4px,transparent 10px)}
-.ed-align-guide-right.snap-off .ed-align-guide-label{background:#94a3b8}
-.ed-align-guide-right.snap-off .ed-align-snap-btn{background:#94a3b8;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+/* Y축 정렬 가이드라인 */
+.ed-align-guide-y{position:absolute;left:0;right:0;height:20px;margin-top:-10px;pointer-events:auto;cursor:ns-resize;z-index:35;touch-action:none;user-select:none;display:none}
+.ed-align-guide-y.visible{display:block}
+.ed-align-guide-y .ed-align-guide-line{position:absolute;left:0;right:0;top:50%;height:2px;margin-top:-1px;width:auto;
+  background:repeating-linear-gradient(to right,#d97706 0,#d97706 8px,transparent 8px,transparent 14px);opacity:1}
+.ed-align-guide-y .ed-align-guide-label{position:absolute;left:8px;top:50%;transform:translateY(-50%);background:#d97706}
+.ed-align-guide-y .ed-align-snap-btn{background:#d97706;box-shadow:0 2px 6px rgba(217,119,6,.4)}
 
 /* 대각선 위젯 제거됨 — 박스 개별 회전으로 대체 */
 
@@ -380,17 +386,37 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
         </div>
         <div style="font-size:10px;color:var(--text3);padding:0 2px">동 구분 없이 하나의 평면도로 그룹화. 전체지도에서 이 이름으로 층 탭 표시</div>
       </div>
-      <!-- 배치 설정: 정렬선 -->
-      <div class="ed-place-cfg" id="edPlaceCfg">
-        <div class="ed-place-cfg-row">
-          <span class="ed-place-cfg-label">좌측정렬</span>
-          <button class="btn" id="edAlignToggleBtn" onclick="edToggleAlignLine('left')" style="font-size:11px;padding:0 10px;height:28px">▶ 시작</button>
-          <button class="btn" id="edAlignSnapToggleBtn" onclick="edToggleAlignSnap('left')" style="font-size:11px;padding:0 8px;height:28px;display:none" title="스냅 ON/OFF">🔒</button>
+      <!-- 상호명 상자 설정 모드 -->
+      <div class="ed-place-cfg" id="edBoxModeCfg">
+        <div class="ed-place-cfg-row" style="margin-bottom:4px">
+          <span class="ed-place-cfg-label" style="font-size:11px;min-width:auto">상자 설정</span>
+          <button class="btn" id="edBoxModeBtn" onclick="edToggleBoxMode()" style="font-size:11px;padding:0 12px;height:28px">▶ OFF</button>
         </div>
-        <div class="ed-place-cfg-row">
-          <span class="ed-place-cfg-label">우측정렬</span>
-          <button class="btn" id="edAlignRToggleBtn" onclick="edToggleAlignLine('right')" style="font-size:11px;padding:0 10px;height:28px">▶ 시작</button>
-          <button class="btn" id="edAlignRSnapToggleBtn" onclick="edToggleAlignSnap('right')" style="font-size:11px;padding:0 8px;height:28px;display:none" title="스냅 ON/OFF">🔒</button>
+        <div id="edBoxModePanel" style="display:none;flex-direction:column;gap:6px">
+          <!-- X축 정렬선 -->
+          <div class="ed-place-cfg-row">
+            <span class="ed-place-cfg-label">X축 정렬</span>
+            <button class="btn" id="edAlignXBtn" onclick="edToggleAxisLine('x')" style="font-size:10px;padding:0 8px;height:26px">OFF</button>
+            <div class="ed-seg" id="edAlignXAnchorSeg" style="display:none">
+              <button class="ed-seg-btn active" id="edAnchorXLeft" onclick="edSetAnchor('x','left')">좌측</button>
+              <button class="ed-seg-btn" id="edAnchorXRight" onclick="edSetAnchor('x','right')">우측</button>
+            </div>
+          </div>
+          <!-- Y축 정렬선 -->
+          <div class="ed-place-cfg-row">
+            <span class="ed-place-cfg-label">Y축 정렬</span>
+            <button class="btn" id="edAlignYBtn" onclick="edToggleAxisLine('y')" style="font-size:10px;padding:0 8px;height:26px">OFF</button>
+            <div class="ed-seg" id="edAlignYAnchorSeg" style="display:none">
+              <button class="ed-seg-btn active" id="edAnchorYTop" onclick="edSetAnchor('y','top')">상단</button>
+              <button class="ed-seg-btn" id="edAnchorYBottom" onclick="edSetAnchor('y','bottom')">하단</button>
+            </div>
+          </div>
+          <!-- 각도 -->
+          <div class="ed-place-cfg-row">
+            <span class="ed-place-cfg-label">각도</span>
+            <span id="edBoxModeAngleLabel" style="font-size:11px;color:var(--text2);font-family:'IBM Plex Mono',monospace">0°</span>
+            <span style="font-size:9px;color:var(--text3);margin-left:4px">첫 박스 각도 기준 자동 적용</span>
+          </div>
         </div>
       </div>
 
@@ -671,71 +697,34 @@ function buildRoomGrid(cardId,bName) {
   wrap.appendChild(grid); return wrap;
 }
 
-// 전체지도 카드 내 평면도 미니 뷰
+// 전체지도 카드 내 평면도 미니 뷰 (고화질 — 원본 이미지 + CSS 오버레이)
 function buildFloorplanView(bName, fp) {
   const wrap = document.createElement('div'); wrap.className='card-floorplan-wrap';
-  const cvs = document.createElement('canvas'); cvs.className='card-floorplan-canvas';
   const boxCount = Object.keys(fp.boxes).length;
-  wrap.appendChild(cvs);
-  const info = document.createElement('div'); info.className='card-floorplan-info';
-  info.textContent = `${fp.dong||''} ${fp.floor||''} \u2022 \ubc30\uce58 ${boxCount}\uac1c \u2014 \ud074\ub9ad\ud558\uba74 \ud3b8\uc9d1`;
-  wrap.appendChild(info);
 
-  const img = new Image();
-  img.onload = () => {
-    // DPR \uace0\ub824 \uc120\uba85\ud55c \ub80c더
-    const dpr = window.devicePixelRatio || 1;
-    const displayW = cvs.offsetWidth || 290;
-    const ratio = img.naturalHeight / img.naturalWidth;
-    const displayH = Math.round(displayW * ratio);
-
-    // canvas \ud06c\uae30 = \ud654\uba74 \ud45c\uc2dc \ud06c\uae30 \xd7 DPR (\uc120\uba85)
-    cvs.width  = Math.round(displayW * dpr);
-    cvs.height = Math.round(displayH * dpr);
-    cvs.style.height = displayH + 'px';
-
-    const ctx = cvs.getContext('2d');
-    ctx.scale(dpr, dpr); // DPR \uc2a4\ucf00\uc77c \uc801\uc6a9
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-
-    // \uc6d0\ubcf8 \uc774\ubbf8\uc9c0 \ub4dc\ub85c\uc6b0 (displayW x displayH \ud06c\uae30\ub85c)
-    ctx.drawImage(img, 0, 0, displayW, displayH);
-
-    // \ubc15\uc2a4 \ub80c더
-    for (const [hosu, b] of Object.entries(fp.boxes)) {
-      const x = b.x/100 * displayW, y = b.y/100 * displayH;
-      const w = b.w/100 * displayW, h = b.h/100 * displayH;
-
-      ctx.save();
-      if(b.rot){ctx.translate(x+w/2,y+h/2);ctx.rotate(b.rot*Math.PI/180);ctx.translate(-(x+w/2),-(y+h/2));}
-
-      ctx.fillStyle = 'rgba(37,99,235,.18)';
-      ctx.strokeStyle = '#2563eb';
-      ctx.lineWidth = Math.max(0.8, displayW / 600);
-      ctx.beginPath(); ctx.rect(x, y, w, h); ctx.fill(); ctx.stroke();
-
-      const fs1 = Math.max(6, h * 0.26);
-      ctx.fillStyle = '#2563eb';
-      ctx.font = `600 ${fs1}px "IBM Plex Mono",monospace`;
-      ctx.fillText(hosu, x + 2, y + fs1 + 1);
-
-      const fs2 = Math.max(7, h * 0.42);
-      ctx.fillStyle = '#1a1c2a';
-      ctx.font = `700 ${fs2}px "Noto Sans KR",sans-serif`;
-      ctx.save(); ctx.beginPath(); ctx.rect(x+1, y, w-2, h); ctx.clip();
-      ctx.fillText(b.name || hosu, x + 3, y + h * 0.82);
-      ctx.restore();
-      ctx.restore();
-    }
-  };
+  const container = document.createElement('div'); container.className='card-fp-container';
+  const img = document.createElement('img');
   img.src = fp.imgDataURL;
+  img.alt = '평면도';
+  img.draggable = false;
+  container.appendChild(img);
 
-  cvs.title = '\uc9c0\ub3c4\uc5d0 \uc800\uc7a5\ub41c \ud3c9\uba74\ub3c4\uc785\ub2c8\ub2e4 (\ud074\ub9ad\ud558\uba74 \ud3b8\uc9d1)';
-  cvs.addEventListener('click', () => {
-    edLoadBuildingByName(bName);
-    switchPage('editor');
-  });
+  // 박스 오버레이 (CSS, 벡터 — 확대해도 선명)
+  for (const [hosu, b] of Object.entries(fp.boxes)) {
+    const box = document.createElement('div'); box.className='card-fp-box';
+    box.style.left=b.x+'%'; box.style.top=b.y+'%'; box.style.width=b.w+'%'; box.style.height=b.h+'%';
+    if(b.rot) box.style.transform=`rotate(${b.rot}deg)`;
+    box.innerHTML = `<div class="card-fp-box-hosu">${hosu}</div><div class="card-fp-box-name">${b.name||hosu}</div>`;
+    container.appendChild(box);
+  }
+
+  container.title = '클릭하면 편집';
+  container.addEventListener('click', () => { edLoadBuildingByName(bName); switchPage('editor'); });
+  wrap.appendChild(container);
+
+  const info = document.createElement('div'); info.className='card-floorplan-info';
+  info.textContent = `${fp.groupName||fp.dong||''} ${fp.floor||''} • 배치 ${boxCount}개 — 클릭하면 편집`;
+  wrap.appendChild(info);
   return wrap;
 }
 
@@ -825,68 +814,95 @@ let edZoom = 1.0;
 let edActiveDong = '전체';
 let edDragging = null, edResizing = null;
 
-// 좌측/우측 정렬선 상태
-let edAlignLeftOn = false;
-let edAlignLeftX  = 20;       // 좌측 정렬 기준 X (%)
-let edAlignLeftSnap = true;
-
-let edAlignRightOn = false;
-let edAlignRightX  = 80;      // 우측 정렬 기준 X (%)
-let edAlignRightSnap = true;
-
-// 하위 호환용 (기존 코드 참조)
-let edAlignMode = 'none';
-let edAlignX = 20;
-let edAlignSnap = true;
+// ── 상자 설정 모드 상태 ──
+let edBoxMode = false;        // 상자 설정 모드 ON/OFF
+let edAxisXOn = false;        // X축 정렬선 ON
+let edAxisXPos = 20;          // X축 정렬선 위치 (%)
+let edAxisXAnchor = 'left';   // 'left' | 'right'
+let edAxisYOn = false;        // Y축 정렬선 ON
+let edAxisYPos = 30;          // Y축 정렬선 위치 (%)
+let edAxisYAnchor = 'top';    // 'top' | 'bottom'
+let edBoxModeRot = 0;         // 설정 모드 각도 (첫 박스 기준)
+let edBoxModeRotSet = false;  // 각도가 설정되었는지
 
 // 그룹명(층명) 상태
-let edGroupNameVal = '';      // 현재 지정된 그룹(층)명
+let edGroupNameVal = '';
 
-function edToggleAlignLine(side) {
-  if (side === 'left') {
-    edAlignLeftOn = !edAlignLeftOn;
-    if (edAlignLeftOn) edAlignLeftSnap = true;
-    showToast(edAlignLeftOn ? '📏 좌측정렬선 ON — 드래그로 이동' : '좌측정렬선 OFF');
-  } else {
-    edAlignRightOn = !edAlignRightOn;
-    if (edAlignRightOn) edAlignRightSnap = true;
-    showToast(edAlignRightOn ? '📏 우측정렬선 ON — 드래그로 이동' : '우측정렬선 OFF');
+// ── 상자 설정 모드 토글 ──
+function edToggleBoxMode() {
+  edBoxMode = !edBoxMode;
+  const btn = document.getElementById('edBoxModeBtn');
+  const panel = document.getElementById('edBoxModePanel');
+  btn.textContent = edBoxMode ? '⏹ ON' : '▶ OFF';
+  btn.classList.toggle('primary', edBoxMode);
+  panel.style.display = edBoxMode ? 'flex' : 'none';
+  if (!edBoxMode) {
+    // OFF시 정렬선 숨기기
+    edAxisXOn = false; edAxisYOn = false;
+    edBoxModeRotSet = false; edBoxModeRot = 0;
+    edUpdateAxisUI();
   }
-  edUpdateAlignBtns();
   edUpdateAlignGuide();
+  if (edBoxMode) edSnapAllBoxes();
+  showToast(edBoxMode ? '⚙️ 상자 설정 모드 ON' : '상자 설정 모드 OFF');
 }
 
-function edToggleAlignSnap(side) {
-  if (side === 'left') {
-    edAlignLeftSnap = !edAlignLeftSnap;
-    showToast(edAlignLeftSnap ? '🔒 좌측 스냅 ON' : '🔓 좌측 스냅 OFF');
+function edToggleAxisLine(axis) {
+  if (axis === 'x') { edAxisXOn = !edAxisXOn; }
+  else { edAxisYOn = !edAxisYOn; }
+  edUpdateAxisUI();
+  edUpdateAlignGuide();
+  if (edBoxMode) edSnapAllBoxes();
+}
+
+function edSetAnchor(axis, anchor) {
+  if (axis === 'x') edAxisXAnchor = anchor;
+  else edAxisYAnchor = anchor;
+  // 버튼 UI
+  if (axis === 'x') {
+    document.getElementById('edAnchorXLeft').classList.toggle('active', anchor==='left');
+    document.getElementById('edAnchorXRight').classList.toggle('active', anchor==='right');
   } else {
-    edAlignRightSnap = !edAlignRightSnap;
-    showToast(edAlignRightSnap ? '🔒 우측 스냅 ON' : '🔓 우측 스냅 OFF');
+    document.getElementById('edAnchorYTop').classList.toggle('active', anchor==='top');
+    document.getElementById('edAnchorYBottom').classList.toggle('active', anchor==='bottom');
   }
-  edUpdateAlignBtns();
-  edUpdateAlignGuide();
+  if (edBoxMode) edSnapAllBoxes();
 }
 
-function edUpdateAlignBtns() {
-  // 좌측
-  const lb = document.getElementById('edAlignToggleBtn');
-  const ls = document.getElementById('edAlignSnapToggleBtn');
-  if (lb) { lb.textContent = edAlignLeftOn ? '⏹ 종료' : '▶ 시작'; lb.classList.toggle('primary', edAlignLeftOn); }
-  if (ls) { ls.style.display = edAlignLeftOn ? '' : 'none'; ls.textContent = edAlignLeftSnap ? '🔒' : '🔓'; }
-  // 우측
-  const rb = document.getElementById('edAlignRToggleBtn');
-  const rs = document.getElementById('edAlignRSnapToggleBtn');
-  if (rb) { rb.textContent = edAlignRightOn ? '⏹ 종료' : '▶ 시작'; rb.classList.toggle('primary', edAlignRightOn); }
-  if (rs) { rs.style.display = edAlignRightOn ? '' : 'none'; rs.textContent = edAlignRightSnap ? '🔒' : '🔓'; }
+function edUpdateAxisUI() {
+  const xBtn = document.getElementById('edAlignXBtn');
+  const xSeg = document.getElementById('edAlignXAnchorSeg');
+  xBtn.textContent = edAxisXOn ? 'ON' : 'OFF';
+  xBtn.classList.toggle('primary', edAxisXOn);
+  xSeg.style.display = edAxisXOn ? '' : 'none';
+
+  const yBtn = document.getElementById('edAlignYBtn');
+  const ySeg = document.getElementById('edAlignYAnchorSeg');
+  yBtn.textContent = edAxisYOn ? 'ON' : 'OFF';
+  yBtn.classList.toggle('primary', edAxisYOn);
+  ySeg.style.display = edAxisYOn ? '' : 'none';
+
+  const aLbl = document.getElementById('edBoxModeAngleLabel');
+  if (aLbl) aLbl.textContent = edBoxModeRot + '°';
 }
 
-// 하위 호환용
-function edSetAlign(mode) {
-  edAlignLeftOn = mode !== 'none';
-  if (edAlignLeftOn) edAlignLeftSnap = true;
-  edUpdateAlignBtns();
-  edUpdateAlignGuide();
+// 모든 박스를 현재 정렬선/각도에 맞춰 스냅
+function edSnapAllBoxes() {
+  if (!edBoxMode) return;
+  for (const [hosu, b] of Object.entries(edBoxes)) {
+    if (edAxisXOn) {
+      if (edAxisXAnchor === 'left') b.x = edAxisXPos;
+      else b.x = edAxisXPos - b.w;
+    }
+    if (edAxisYOn) {
+      if (edAxisYAnchor === 'top') b.y = edAxisYPos;
+      else b.y = edAxisYPos - b.h;
+    }
+    b.x = Math.max(0, Math.min(98 - b.w, b.x));
+    b.y = Math.max(0, Math.min(98 - b.h, b.y));
+    if (edBoxModeRotSet) b.rot = edBoxModeRot;
+  }
+  edRenderAllBoxes();
 }
 
 // 그룹명(층명) 적용
@@ -897,61 +913,68 @@ function edApplyGroupName() {
   showToast(`✅ 그룹명 "${edGroupNameVal}" 적용됨`);
 }
 
+// ── 정렬 가이드라인 렌더 ──
 function edUpdateAlignGuide() {
   const wr = document.getElementById('edCanvasWrapper');
   if (!wr) return;
-  edCreateOrUpdateGuide(wr, 'left', 'edAlignGuideL', edAlignLeftOn, edAlignLeftX, edAlignLeftSnap, '← L');
-  edCreateOrUpdateGuide(wr, 'right', 'edAlignGuideR', edAlignRightOn, edAlignRightX, edAlignRightSnap, 'R →');
+  // X축 (세로선)
+  edCreateOrUpdateGuideX(wr, 'edAlignGuideX', edBoxMode && edAxisXOn, edAxisXPos, edAxisXAnchor === 'left' ? '← L' : 'R →');
+  // Y축 (가로선)
+  edCreateOrUpdateGuideY(wr, 'edAlignGuideY', edBoxMode && edAxisYOn, edAxisYPos, edAxisYAnchor === 'top' ? '↑ T' : 'B ↓');
 }
 
-function edCreateOrUpdateGuide(wr, side, guideId, isOn, xPos, snapOn, labelText) {
+function edCreateOrUpdateGuideX(wr, guideId, isOn, xPos, labelText) {
   let guide = document.getElementById(guideId);
   if (!isOn) { if (guide) guide.classList.remove('visible'); return; }
-
   if (!guide) {
     guide = document.createElement('div');
     guide.id = guideId;
-    guide.className = 'ed-align-guide' + (side === 'right' ? ' ed-align-guide-right' : '');
-
-    const line = document.createElement('div'); line.className = 'ed-align-guide-line';
-    guide.appendChild(line);
-    const label = document.createElement('div'); label.className = 'ed-align-guide-label';
-    guide.appendChild(label);
-    const snapBtn = document.createElement('div');
-    snapBtn.className = 'ed-align-snap-btn';
-    snapBtn.title = '클릭: 스냅 ON/OFF';
-    snapBtn.textContent = '🔒';
-    guide.appendChild(snapBtn);
+    guide.className = 'ed-align-guide';
+    const line = document.createElement('div'); line.className = 'ed-align-guide-line'; guide.appendChild(line);
+    const label = document.createElement('div'); label.className = 'ed-align-guide-label'; guide.appendChild(label);
     wr.appendChild(guide);
-
-    snapBtn.addEventListener('click', ev => {
-      ev.stopPropagation();
-      edToggleAlignSnap(side);
-    });
-
     guide.addEventListener('mousedown', ev => {
-      if (ev.target.closest('.ed-align-snap-btn')) return;
       ev.preventDefault(); ev.stopPropagation();
-      const startX = ev.clientX;
-      const startAlignX = side === 'left' ? edAlignLeftX : edAlignRightX;
+      const startX = ev.clientX, startPos = edAxisXPos;
       const move = mv => {
-        const dx = (mv.clientX - startX) / (edImgNW * edZoom) * 100;
-        const newX = Math.max(0, Math.min(98, startAlignX + dx));
-        if (side === 'left') edAlignLeftX = newX; else edAlignRightX = newX;
+        edAxisXPos = Math.max(0, Math.min(98, startPos + (mv.clientX - startX) / (edImgNW * edZoom) * 100));
         edUpdateAlignGuide();
+        if (edBoxMode) edSnapAllBoxes();
       };
       const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
       window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
     });
   }
-
-  guide.classList.add('visible');
-  guide.classList.toggle('snap-off', !snapOn);
+  guide.classList.add('visible'); guide.classList.remove('snap-off');
   guide.style.left = xPos + '%';
-  const lbl = guide.querySelector('.ed-align-guide-label');
-  if (lbl) lbl.textContent = labelText + (snapOn ? '' : ' [OFF]');
-  const sb = guide.querySelector('.ed-align-snap-btn');
-  if (sb) sb.textContent = snapOn ? '🔒' : '🔓';
+  guide.querySelector('.ed-align-guide-label').textContent = labelText;
+}
+
+function edCreateOrUpdateGuideY(wr, guideId, isOn, yPos, labelText) {
+  let guide = document.getElementById(guideId);
+  if (!isOn) { if (guide) guide.classList.remove('visible'); return; }
+  if (!guide) {
+    guide = document.createElement('div');
+    guide.id = guideId;
+    guide.className = 'ed-align-guide-y';
+    const line = document.createElement('div'); line.className = 'ed-align-guide-line'; guide.appendChild(line);
+    const label = document.createElement('div'); label.className = 'ed-align-guide-label'; guide.appendChild(label);
+    wr.appendChild(guide);
+    guide.addEventListener('mousedown', ev => {
+      ev.preventDefault(); ev.stopPropagation();
+      const startY = ev.clientY, startPos = edAxisYPos;
+      const move = mv => {
+        edAxisYPos = Math.max(0, Math.min(98, startPos + (mv.clientY - startY) / (edImgNH * edZoom) * 100));
+        edUpdateAlignGuide();
+        if (edBoxMode) edSnapAllBoxes();
+      };
+      const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+      window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+    });
+  }
+  guide.classList.add('visible');
+  guide.style.top = yPos + '%';
+  guide.querySelector('.ed-align-guide-label').textContent = labelText;
 }
 
 // ── 건물 목록 채우기 ──
@@ -1077,19 +1100,24 @@ function edOnCanvasClick(e) {
   const boxW = (90 / edImgNW) * 100, boxH = (34 / edImgNH) * 100;
   let bx = (px / edImgNW) * 100, by = (py / edImgNH) * 100;
 
-  // ① 좌측정렬선 스냅
-  if (edAlignLeftOn && edAlignLeftSnap) {
-    bx = edAlignLeftX;
-  }
-  // ② 우측정렬선 스냅 (박스 우측 끝 정렬)
-  if (edAlignRightOn && edAlignRightSnap) {
-    bx = edAlignRightX - boxW;
+  let rot = 0;
+  // 상자 설정 모드 적용
+  if (edBoxMode) {
+    if (edAxisXOn) {
+      if (edAxisXAnchor === 'left') bx = edAxisXPos;
+      else bx = edAxisXPos - boxW;
+    }
+    if (edAxisYOn) {
+      if (edAxisYAnchor === 'top') by = edAxisYPos;
+      else by = edAxisYPos - boxH;
+    }
+    if (edBoxModeRotSet) rot = edBoxModeRot;
   }
 
   bx = Math.max(0, Math.min(98 - boxW, bx));
   by = Math.max(0, Math.min(98 - boxH, by));
 
-  edBoxes[edSelectedUnit.호수] = { x: bx, y: by, w: boxW, h: boxH, rot: 0, name: edSelectedUnit.상호명, unit: edSelectedUnit };
+  edBoxes[edSelectedUnit.호수] = { x: bx, y: by, w: boxW, h: boxH, rot: rot, name: edSelectedUnit.상호명, unit: edSelectedUnit };
 
   edRenderAllBoxes(); edRenderUnitList();
   const all = edActiveDong === '전체' ? edUnits : edUnits.filter(u => u.동 === edActiveDong);
@@ -1122,7 +1150,23 @@ function edStartDrag(e) {
   e.preventDefault();e.stopPropagation();
   const el=e.currentTarget,hosu=el.dataset.hosu,b=edBoxes[hosu];
   const sd={hosu,el,sx:e.clientX,sy:e.clientY,ox:b.x,oy:b.y};
-  const move=ev=>{const dx=(ev.clientX-sd.sx)/(edImgNW*edZoom)*100,dy=(ev.clientY-sd.sy)/(edImgNH*edZoom)*100;edBoxes[sd.hosu].x=Math.max(0,Math.min(95,sd.ox+dx));edBoxes[sd.hosu].y=Math.max(0,Math.min(95,sd.oy+dy));sd.el.style.left=edBoxes[sd.hosu].x+'%';sd.el.style.top=edBoxes[sd.hosu].y+'%';};
+  const move=ev=>{
+    const dx=(ev.clientX-sd.sx)/(edImgNW*edZoom)*100,dy=(ev.clientY-sd.sy)/(edImgNH*edZoom)*100;
+    let nx=Math.max(0,Math.min(95,sd.ox+dx)), ny=Math.max(0,Math.min(95,sd.oy+dy));
+    // 상자 설정 모드: 정렬선에 고정
+    if(edBoxMode){
+      if(edAxisXOn){
+        if(edAxisXAnchor==='left') nx=edAxisXPos; else nx=edAxisXPos-b.w;
+        nx=Math.max(0,Math.min(95,nx));
+      }
+      if(edAxisYOn){
+        if(edAxisYAnchor==='top') ny=edAxisYPos; else ny=edAxisYPos-b.h;
+        ny=Math.max(0,Math.min(95,ny));
+      }
+    }
+    edBoxes[sd.hosu].x=nx;edBoxes[sd.hosu].y=ny;
+    sd.el.style.left=nx+'%';sd.el.style.top=ny+'%';
+  };
   const up=()=>{window.removeEventListener('mousemove',move);window.removeEventListener('mouseup',up);};
   window.addEventListener('mousemove',move);window.addEventListener('mouseup',up);
 }
@@ -1145,10 +1189,19 @@ function edStartRotate(e) {
   const move=ev=>{
     const angle=Math.atan2(ev.clientY-cy,ev.clientX-cx)*180/Math.PI;
     let newRot=startRot+(angle-startAngle);
-    // 5도 단위 스냅 (Shift 없이 기본)
     newRot=Math.round(newRot/5)*5;
     edBoxes[hosu].rot=newRot;
     el.style.transform=`rotate(${newRot}deg)`;
+    // 상자 설정 모드: 이 각도를 기준 각도로 설정하고 모든 박스에 적용
+    if(edBoxMode){
+      edBoxModeRot=newRot; edBoxModeRotSet=true;
+      edUpdateAxisUI();
+      for(const [h2,b2] of Object.entries(edBoxes)){
+        if(h2===hosu) continue;
+        b2.rot=newRot;
+      }
+      edRenderAllBoxes();
+    }
   };
   const up=()=>{window.removeEventListener('mousemove',move);window.removeEventListener('mouseup',up);};
   window.addEventListener('mousemove',move);window.addEventListener('mouseup',up);
