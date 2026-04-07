@@ -185,8 +185,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 .card-fp-container{position:relative;width:100%;border-radius:6px;border:1px solid var(--line);overflow:hidden;background:#f8f9fe;cursor:pointer}
 .card-fp-container img{width:100%;display:block;image-rendering:auto}
 .card-fp-box{position:absolute;background:rgba(37,99,235,.15);border:1.5px solid #2563eb;border-radius:2px;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;pointer-events:none}
-.card-fp-box-hosu{font-family:'IBM Plex Mono',monospace;font-size:max(0.5vw,5px);font-weight:600;color:#2563eb;position:absolute;top:1px;left:2px;line-height:1}
-.card-fp-box-name{font-size:max(0.6vw,6px);font-weight:700;color:#1a1c2a;text-align:center;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;padding:0 2px}
+.card-fp-box-hosu{font-family:'IBM Plex Mono',monospace;font-size:8px;font-weight:600;color:#2563eb;position:absolute;top:1px;left:2px;line-height:1}
+.card-fp-box-name{font-size:10px;font-weight:700;color:#1a1c2a;text-align:center;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;padding:1px 3px;text-shadow:0 0 3px #fff,0 0 3px #fff}
 
 /* Editor Canvas */
 .ed-canvas-area{flex:1;overflow:auto;background:#e8eaf0;background-image:radial-gradient(circle,#c8cde0 1px,transparent 1px);background-size:20px 20px;position:relative}
@@ -763,14 +763,14 @@ function setupCardDrag(card,cardId){
 
 // ── PAN & ZOOM ──
 function applyTransform(){document.getElementById('canvas').style.transform=`translate(${panOffset.x}px,${panOffset.y}px) scale(${zoomScale})`;document.getElementById('zoomLevel').textContent=Math.round(zoomScale*100)+'%';}
-function setZoom(n){zoomScale=Math.min(Math.max(n,.3),2);applyTransform();}
+function setZoom(n){zoomScale=Math.min(Math.max(n,.1),8);applyTransform();}
 const wrapper=document.getElementById('canvasWrapper');
 wrapper.addEventListener('mousedown',e=>{if(isDraggingCard||e.target.closest('.building-card'))return;isPanning=true;panStart={x:e.clientX-panOffset.x,y:e.clientY-panOffset.y};wrapper.classList.add('panning');});
 document.addEventListener('mousemove',e=>{if(!isPanning)return;panOffset.x=e.clientX-panStart.x;panOffset.y=e.clientY-panStart.y;applyTransform();});
 document.addEventListener('mouseup',()=>{isPanning=false;wrapper.classList.remove('panning');});
-wrapper.addEventListener('wheel',e=>{e.preventDefault();setZoom(zoomScale+(e.deltaY>0?-0.08:0.08));},{passive:false});
-document.getElementById('zoomIn').addEventListener('click',()=>setZoom(zoomScale+.1));
-document.getElementById('zoomOut').addEventListener('click',()=>setZoom(zoomScale-.1));
+wrapper.addEventListener('wheel',e=>{e.preventDefault();const step=zoomScale*0.12;setZoom(zoomScale+(e.deltaY>0?-step:step));},{passive:false});
+document.getElementById('zoomIn').addEventListener('click',()=>setZoom(zoomScale*1.25));
+document.getElementById('zoomOut').addEventListener('click',()=>setZoom(zoomScale/1.25));
 document.getElementById('zoomFit').addEventListener('click',()=>{zoomScale=1;panOffset={x:80,y:80};applyTransform();});
 
 // ── DETAIL PANEL ──
