@@ -368,12 +368,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
       <!-- 배치 설정: 열 정렬 + 대각선 -->
       <div class="ed-place-cfg" id="edPlaceCfg">
         <div class="ed-place-cfg-row">
-          <span class="ed-place-cfg-label">열 정렬</span>
-          <div class="ed-seg">
-            <button class="ed-seg-btn active" id="edAlignNone" onclick="edSetAlign('none')">없음</button>
-            <button class="ed-seg-btn" id="edAlignLeft" onclick="edSetAlign('left')">⬅ 왼쪽</button>
-            <button class="ed-seg-btn" id="edAlignRight" onclick="edSetAlign('right')">오른쪽 ➡</button>
-          </div>
+          <span class="ed-place-cfg-label">좌측정렬선</span>
+          <button class="btn" id="edAlignToggleBtn" onclick="edToggleAlignLine()" style="font-size:11px;padding:0 10px;height:28px">▶ 시작</button>
+          <button class="btn" id="edAlignSnapToggleBtn" onclick="edToggleAlignSnap()" style="font-size:11px;padding:0 8px;height:28px;display:none" title="스냅 ON/OFF">🔒</button>
         </div>
         <div class="ed-place-cfg-row">
           <span class="ed-place-cfg-label">대각선</span>
@@ -824,9 +821,9 @@ let edZoom = 1.0;
 let edActiveDong = '전체';
 let edDragging = null, edResizing = null;
 
-// 열 정렬 상태 — edAlignSnap: 가이드는 보이되 스냅만 OFF
-let edAlignMode = 'none';   // 'none' | 'left' | 'right'
-let edAlignX   = 8;         // 정렬 기준 X (% of image)
+// 좌측정렬선 상태
+let edAlignMode = 'none';   // 'none' | 'left'
+let edAlignX   = 20;        // 정렬 기준 X (% of image) — 자유 이동 가능
 let edAlignSnap = true;     // TRUE: 스냅 적용 / FALSE: 가이드만 표시
 
 // ── 대각선 방향 상태 ──
@@ -835,24 +832,46 @@ let edDiagDX   = 8;         // X 오프셋 (%)
 let edDiagDY   = 6;         // Y 오프셋 (%)
 let _diagBasePlaced = null; // 대각선 기준 박스 위치 (첫 클릭 후 설정)
 
-function edSetAlign(mode) {
-  // 활성중인 열정렬 뺄튼 재클릭 → 스냅 ON/OFF 토글
-  if (edAlignMode === mode && mode !== 'none') {
-    edAlignSnap = !edAlignSnap;
-    edUpdateAlignGuide();
-    showToast(edAlignSnap ? '\uD83D\uDD12 \uc5f4 \uc2a4\ub0c5 ON' : '\uD83D\uDD13 \uc5f4 \uc2a4\ub0c5 OFF (\uac00\uc774\ub4dc\ub9cc)');
-    return;
+function edToggleAlignLine() {
+  if (edAlignMode === 'none') {
+    edAlignMode = 'left';
+    edAlignSnap = true;
+    showToast('📏 좌측정렬선 ON — 드래그로 위치 이동');
+  } else {
+    edAlignMode = 'none';
+    showToast('좌측정렬선 OFF');
   }
-  edAlignMode = mode;
-  if (mode !== 'none') edAlignSnap = true; // 모드 변경 시 스냅 자동 ON
-  ['None','Left','Right'].forEach(k => {
-    const el = document.getElementById('edAlign' + k);
-    if (el) el.classList.toggle('active',
-      (mode === 'none' && k === 'None') ||
-      (mode === 'left' && k === 'Left') ||
-      (mode === 'right' && k === 'Right')
-    );
-  });
+  edUpdateAlignBtn();
+  edUpdateAlignGuide();
+}
+
+function edToggleAlignSnap() {
+  edAlignSnap = !edAlignSnap;
+  edUpdateAlignGuide();
+  edUpdateAlignBtn();
+  showToast(edAlignSnap ? '🔒 스냅 ON' : '🔓 스냅 OFF (가이드만)');
+}
+
+function edUpdateAlignBtn() {
+  const btn = document.getElementById('edAlignToggleBtn');
+  const snapBtn = document.getElementById('edAlignSnapToggleBtn');
+  if (edAlignMode === 'none') {
+    btn.textContent = '▶ 시작';
+    btn.classList.remove('primary');
+    snapBtn.style.display = 'none';
+  } else {
+    btn.textContent = '⏹ 종료';
+    btn.classList.add('primary');
+    snapBtn.style.display = '';
+    snapBtn.textContent = edAlignSnap ? '🔒' : '🔓';
+  }
+}
+
+// 하위 호환용
+function edSetAlign(mode) {
+  edAlignMode = mode === 'none' ? 'none' : 'left';
+  if (mode !== 'none') edAlignSnap = true;
+  edUpdateAlignBtn();
   edUpdateAlignGuide();
 }
 
@@ -932,12 +951,10 @@ function edUpdateAlignGuide() {
   guide.classList.add('visible');
   guide.classList.toggle('snap-off', !edAlignSnap);
 
-  const boxW = edImgNW ? (90 / edImgNW) * 100 : 8;
-  const xPct = edAlignMode === 'right' ? edAlignX - boxW : edAlignX;
-  guide.style.left = xPct + '%';
+  guide.style.left = edAlignX + '%';
 
   const lbl = document.getElementById('edAlignGuideLabel');
-  if (lbl) lbl.textContent = (edAlignMode === 'left' ? '\u2190 L' : 'R \u2192') + (edAlignSnap ? '' : ' [OFF]');
+  if (lbl) lbl.textContent = '← L' + (edAlignSnap ? '' : ' [OFF]');
   const sb = document.getElementById('edAlignSnapBtn');
   if (sb) sb.textContent = edAlignSnap ? '\uD83D\uDD12' : '\uD83D\uDD13';
 }
@@ -1097,13 +1114,9 @@ function edOnCanvasClick(e) {
     // ≡ else: 첫 클릭은 클릭한 곳에 배치 (bx, by 유지)
   }
 
-  // ② 열 정렬 스냅 (edAlignSnap ON 일 때만 적용)
-  if (edAlignSnap) {
-    if (edAlignMode === 'left') {
-      bx = edAlignX;           // 왼쪽 열: left edge 고정
-    } else if (edAlignMode === 'right') {
-      bx = edAlignX - boxW;    // 오른쪽 열: right edge 고정
-    }
+  // ② 좌측정렬선 스냅 (edAlignSnap ON 일 때만 적용)
+  if (edAlignSnap && edAlignMode === 'left') {
+    bx = edAlignX;           // 왼쪽 열: left edge 고정
   }
 
   bx = Math.max(0, Math.min(98 - boxW, bx));
