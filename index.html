@@ -843,8 +843,7 @@ function edToggleBoxMode() {
     edUpdateAxisUI();
   }
   edUpdateAlignGuide();
-  if (edBoxMode) edSnapAllBoxes();
-  showToast(edBoxMode ? '⚙️ 상자 설정 모드 ON' : '상자 설정 모드 OFF');
+  showToast(edBoxMode ? '⚙️ 상자 설정 모드 ON — 이후 배치되는 박스에 적용' : '상자 설정 모드 OFF');
 }
 
 function edToggleAxisLine(axis) {
@@ -852,7 +851,6 @@ function edToggleAxisLine(axis) {
   else { edAxisYOn = !edAxisYOn; }
   edUpdateAxisUI();
   edUpdateAlignGuide();
-  if (edBoxMode) edSnapAllBoxes();
 }
 
 function edSetAnchor(axis, anchor) {
@@ -866,7 +864,6 @@ function edSetAnchor(axis, anchor) {
     document.getElementById('edAnchorYTop').classList.toggle('active', anchor==='top');
     document.getElementById('edAnchorYBottom').classList.toggle('active', anchor==='bottom');
   }
-  if (edBoxMode) edSnapAllBoxes();
 }
 
 function edUpdateAxisUI() {
@@ -884,25 +881,6 @@ function edUpdateAxisUI() {
 
   const aLbl = document.getElementById('edBoxModeAngleLabel');
   if (aLbl) aLbl.textContent = edBoxModeRot + '°';
-}
-
-// 모든 박스를 현재 정렬선/각도에 맞춰 스냅
-function edSnapAllBoxes() {
-  if (!edBoxMode) return;
-  for (const [hosu, b] of Object.entries(edBoxes)) {
-    if (edAxisXOn) {
-      if (edAxisXAnchor === 'left') b.x = edAxisXPos;
-      else b.x = edAxisXPos - b.w;
-    }
-    if (edAxisYOn) {
-      if (edAxisYAnchor === 'top') b.y = edAxisYPos;
-      else b.y = edAxisYPos - b.h;
-    }
-    b.x = Math.max(0, Math.min(98 - b.w, b.x));
-    b.y = Math.max(0, Math.min(98 - b.h, b.y));
-    if (edBoxModeRotSet) b.rot = edBoxModeRot;
-  }
-  edRenderAllBoxes();
 }
 
 // 그룹명(층명) 적용
@@ -939,7 +917,7 @@ function edCreateOrUpdateGuideX(wr, guideId, isOn, xPos, labelText) {
       const move = mv => {
         edAxisXPos = Math.max(0, Math.min(98, startPos + (mv.clientX - startX) / (edImgNW * edZoom) * 100));
         edUpdateAlignGuide();
-        if (edBoxMode) edSnapAllBoxes();
+        // 가이드 위치만 갱신 (기존 박스는 움직이지 않음)
       };
       const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
       window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
@@ -966,7 +944,7 @@ function edCreateOrUpdateGuideY(wr, guideId, isOn, yPos, labelText) {
       const move = mv => {
         edAxisYPos = Math.max(0, Math.min(98, startPos + (mv.clientY - startY) / (edImgNH * edZoom) * 100));
         edUpdateAlignGuide();
-        if (edBoxMode) edSnapAllBoxes();
+        // 가이드 위치만 갱신 (기존 박스는 움직이지 않음)
       };
       const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
       window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
@@ -1152,18 +1130,7 @@ function edStartDrag(e) {
   const sd={hosu,el,sx:e.clientX,sy:e.clientY,ox:b.x,oy:b.y};
   const move=ev=>{
     const dx=(ev.clientX-sd.sx)/(edImgNW*edZoom)*100,dy=(ev.clientY-sd.sy)/(edImgNH*edZoom)*100;
-    let nx=Math.max(0,Math.min(95,sd.ox+dx)), ny=Math.max(0,Math.min(95,sd.oy+dy));
-    // 상자 설정 모드: 정렬선에 고정
-    if(edBoxMode){
-      if(edAxisXOn){
-        if(edAxisXAnchor==='left') nx=edAxisXPos; else nx=edAxisXPos-b.w;
-        nx=Math.max(0,Math.min(95,nx));
-      }
-      if(edAxisYOn){
-        if(edAxisYAnchor==='top') ny=edAxisYPos; else ny=edAxisYPos-b.h;
-        ny=Math.max(0,Math.min(95,ny));
-      }
-    }
+    const nx=Math.max(0,Math.min(95,sd.ox+dx)), ny=Math.max(0,Math.min(95,sd.oy+dy));
     edBoxes[sd.hosu].x=nx;edBoxes[sd.hosu].y=ny;
     sd.el.style.left=nx+'%';sd.el.style.top=ny+'%';
   };
@@ -1192,15 +1159,10 @@ function edStartRotate(e) {
     newRot=Math.round(newRot/5)*5;
     edBoxes[hosu].rot=newRot;
     el.style.transform=`rotate(${newRot}deg)`;
-    // 상자 설정 모드: 이 각도를 기준 각도로 설정하고 모든 박스에 적용
+    // 상자 설정 모드: 이 각도를 기준 각도로 저장 (이후 새 박스에만 적용)
     if(edBoxMode){
       edBoxModeRot=newRot; edBoxModeRotSet=true;
       edUpdateAxisUI();
-      for(const [h2,b2] of Object.entries(edBoxes)){
-        if(h2===hosu) continue;
-        b2.rot=newRot;
-      }
-      edRenderAllBoxes();
     }
   };
   const up=()=>{window.removeEventListener('mousemove',move);window.removeEventListener('mouseup',up);};
