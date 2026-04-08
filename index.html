@@ -184,9 +184,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 /* 고화질 평면도 오버레이 */
 .card-fp-container{position:relative;width:100%;border-radius:6px;border:1px solid var(--line);overflow:visible;background:#f8f9fe;cursor:pointer}
 .card-fp-container img{width:100%;display:block;image-rendering:auto}
-.card-fp-box{position:absolute;background:rgba(37,99,235,.12);border:2px solid #2563eb;border-radius:3px;overflow:visible;pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.card-fp-box .fp-hosu{font-family:'IBM Plex Mono',monospace;font-weight:600;color:#2563eb;position:absolute;top:1px;left:2px;line-height:1;white-space:nowrap}
-.card-fp-box .fp-name{font-weight:700;color:#1a1c2a;text-align:center;line-height:1.2;white-space:nowrap;padding:2px 4px;text-shadow:0 0 4px #fff,0 0 4px #fff,0 0 8px #fff,0 0 8px #fff}
+.card-fp-box{position:absolute;background:rgba(37,99,235,.12);border:2px solid #2563eb;border-radius:3px;overflow:hidden;pointer-events:auto;display:flex;align-items:center;cursor:pointer}
+.card-fp-box .fp-name{font-weight:700;color:#1a1c2a;text-align:left;line-height:1.2;white-space:nowrap;padding:2px 4px;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 6px #fff;pointer-events:none}
 
 /* Editor Canvas */
 .ed-canvas-area{flex:1;overflow:auto;background:#e8eaf0;background-image:radial-gradient(circle,#c8cde0 1px,transparent 1px);background-size:20px 20px;position:relative}
@@ -204,8 +203,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 .obox{position:absolute;background:rgba(37,99,235,.12);border:2px solid #2563eb;border-radius:3px;cursor:move;user-select:none;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:box-shadow .15s}
 .obox:hover{box-shadow:0 0 0 3px rgba(37,99,235,.25)}
 .obox.obox-selected{background:rgba(37,99,235,.22);border-color:#1d4ed8;box-shadow:0 0 0 3px rgba(37,99,235,.3)}
-.obox-hosu{font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;color:var(--blue);position:absolute;top:2px;left:3px;line-height:1}
-.obox-name{font-size:11px;font-weight:700;color:#1a1c2a;text-align:center;padding:2px 6px;line-height:1.2;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none}
+.obox-hosu{display:none}
+.obox-name{font-size:11px;font-weight:700;color:#1a1c2a;text-align:left;padding:2px 6px;line-height:1.2;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none}
 .obox-del{position:absolute;top:-7px;right:-7px;width:15px;height:15px;background:var(--red);color:#fff;border-radius:50%;font-size:8px;display:none;align-items:center;justify-content:center;cursor:pointer;z-index:20;font-weight:900;box-shadow:0 1px 4px rgba(0,0,0,.2)}
 .obox:hover .obox-del-old{display:flex}
 .obox-resize{position:absolute;bottom:0;right:0;width:10px;height:10px;cursor:se-resize;background:var(--blue);opacity:.7;border-radius:1px 0 0 0}
@@ -409,6 +408,15 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
             <div class="ed-seg" id="edAlignYAnchorSeg" style="display:none">
               <button class="ed-seg-btn active" id="edAnchorYTop" onclick="edSetAnchor('y','top')">상단</button>
               <button class="ed-seg-btn" id="edAnchorYBottom" onclick="edSetAnchor('y','bottom')">하단</button>
+            </div>
+          </div>
+          <!-- 텍스트 정렬 -->
+          <div class="ed-place-cfg-row">
+            <span class="ed-place-cfg-label">텍스트</span>
+            <div class="ed-seg" id="edTextAlignSeg">
+              <button class="ed-seg-btn active" id="edTextAlignLeft" onclick="edSetTextAlign('left')">좌측</button>
+              <button class="ed-seg-btn" id="edTextAlignCenter" onclick="edSetTextAlign('center')">가운데</button>
+              <button class="ed-seg-btn" id="edTextAlignRight" onclick="edSetTextAlign('right')">우측</button>
             </div>
           </div>
           <!-- 각도 -->
@@ -755,19 +763,33 @@ function buildFloorplanView(bName, fp) {
   img.draggable = false;
   container.appendChild(img);
 
-  // 이미지 로드 후 실제 컨테이너 높이 기준으로 박스+글씨 크기 계산
+  // 이미지 로드 후 컨테이너/원본 비율로 글씨 크기 계산 (편집기와 동일 비율)
   const renderBoxes = () => {
     container.querySelectorAll('.card-fp-box').forEach(el => el.remove());
-    const cH = container.offsetHeight || 200;
+    // 편집기에서 상호명 11px @ 원본이미지 기준 → 카드에서도 같은 비율
+    // scale = 카드표시폭 / 원본이미지폭
+    const cW = container.offsetWidth || 300;
+    const natW = img.naturalWidth || cW;
+    const scale = cW / natW;
     for (const [hosu, b] of Object.entries(fp.boxes)) {
       const box = document.createElement('div'); box.className='card-fp-box';
       box.style.left=b.x+'%'; box.style.top=b.y+'%'; box.style.width=b.w+'%'; box.style.height=b.h+'%';
       if(b.rot) box.style.transform=`rotate(${b.rot}deg)`;
-      // 실제 박스 높이(px) 계산 → 편집기 비율 동일하게 폰트 설정
-      const boxPxH = cH * b.h / 100;
-      const fHosu = Math.max(6, boxPxH * 0.26);
-      const fName = Math.max(7, boxPxH * 0.38);
-      box.innerHTML = `<span class="fp-hosu" style="font-size:${fHosu.toFixed(1)}px">${hosu}</span><span class="fp-name" style="font-size:${fName.toFixed(1)}px">${b.name||hosu}</span>`;
+      // 편집기 obox-name = 11px @ 원본크기 → 카드에서는 11 * scale
+      const fName = 11 * scale;
+      const ta = b.textAlign || 'left';
+      box.innerHTML = `<span class="fp-name" style="font-size:${fName.toFixed(1)}px;text-align:${ta}">${b.name||hosu}</span>`;
+      box.style.pointerEvents = 'auto';
+      box.style.cursor = 'pointer';
+      box.dataset.hosu = hosu;
+      box.dataset.bname = bName;
+      box.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        // rawSheetRows에서 해당 호실 찾기
+        const room = rawSheetRows.find(r => (r['호']||'') === hosu && (r['상가명']||'').includes(bName));
+        if (room) openDetail(room, bName);
+        else showToast(`${hosu}호 정보 없음`);
+      });
       container.appendChild(box);
     }
   };
@@ -881,6 +903,7 @@ let edAxisYPos = 30;          // Y축 정렬선 위치 (%)
 let edAxisYAnchor = 'top';    // 'top' | 'bottom'
 let edBoxModeRot = 0;         // 설정 모드 각도 (첫 박스 기준)
 let edBoxModeRotSet = false;  // 각도가 설정되었는지
+let edTextAlign = 'left';    // 텍스트 정렬: 'left' | 'center' | 'right'
 
 // 그룹명(층명) 상태
 let edGroupNameVal = '';
@@ -897,6 +920,8 @@ function edToggleBoxMode() {
     // OFF시 정렬선 숨기기
     edAxisXOn = false; edAxisYOn = false;
     edBoxModeRotSet = false; edBoxModeRot = 0;
+    edTextAlign = 'left';
+    edSetTextAlign('left');
     edUpdateAxisUI();
   }
   edUpdateAlignGuide();
@@ -921,6 +946,13 @@ function edSetAnchor(axis, anchor) {
     document.getElementById('edAnchorYTop').classList.toggle('active', anchor==='top');
     document.getElementById('edAnchorYBottom').classList.toggle('active', anchor==='bottom');
   }
+}
+
+function edSetTextAlign(align) {
+  edTextAlign = align;
+  document.getElementById('edTextAlignLeft').classList.toggle('active', align==='left');
+  document.getElementById('edTextAlignCenter').classList.toggle('active', align==='center');
+  document.getElementById('edTextAlignRight').classList.toggle('active', align==='right');
 }
 
 function edUpdateAxisUI() {
@@ -1233,7 +1265,8 @@ function edOnCanvasClick(e) {
   bx = Math.max(0, Math.min(98 - boxW, bx));
   by = Math.max(0, Math.min(98 - boxH, by));
 
-  edBoxes[edSelectedUnit.호수] = { x: bx, y: by, w: boxW, h: boxH, rot: rot, name: edSelectedUnit.상호명, unit: edSelectedUnit };
+  const tAlign = edBoxMode ? edTextAlign : 'left';
+  edBoxes[edSelectedUnit.호수] = { x: bx, y: by, w: boxW, h: boxH, rot: rot, name: edSelectedUnit.상호명, textAlign: tAlign, unit: edSelectedUnit };
 
   edRenderAllBoxes(); edRenderUnitList();
   const all = edActiveDong === '전체' ? edUnits : edUnits.filter(u => u.동 === edActiveDong);
@@ -1252,7 +1285,8 @@ function edRenderAllBoxes() {
     el.dataset.hosu = hosu;
     el.style.left=b.x+'%'; el.style.top=b.y+'%'; el.style.width=b.w+'%'; el.style.height=b.h+'%';
     if (b.rot) el.style.transform = `rotate(${b.rot}deg)`;
-    el.innerHTML = `<div class="obox-hosu">${hosu}</div><div class="obox-name">${b.unit.상호명||hosu}</div><div class="obox-del">✕</div><div class="obox-rotate" title="회전">↻</div><div class="obox-resize"></div>`;
+    const ta = b.textAlign || 'left';
+    el.innerHTML = `<div class="obox-hosu">${hosu}</div><div class="obox-name" style="text-align:${ta}">${b.unit.상호명||hosu}</div><div class="obox-del">✕</div><div class="obox-rotate" title="회전">↻</div><div class="obox-resize"></div>`;
     el.querySelector('.obox-del').addEventListener('click',ev=>{ev.stopPropagation();delete edBoxes[hosu];edRenderAllBoxes();edRenderUnitList();});
     el.querySelector('.obox-rotate').addEventListener('mousedown',edStartRotate);
     el.addEventListener('mousedown',edStartDrag);
@@ -1342,7 +1376,7 @@ function edSaveToMap(){
   if(!edGroupNameVal){showToast('그룹(층) 이름을 먼저 지정하세요');return;}
 
   const gName = edGroupNameVal;
-  const boxData = Object.fromEntries(Object.entries(edBoxes).map(([k,v])=>[k,{x:v.x,y:v.y,w:v.w,h:v.h,rot:v.rot||0,name:v.unit?.상호명||''}]));
+  const boxData = Object.fromEntries(Object.entries(edBoxes).map(([k,v])=>[k,{x:v.x,y:v.y,w:v.w,h:v.h,rot:v.rot||0,name:v.unit?.상호명||'',textAlign:v.textAlign||'left'}]));
 
   const edInput = document.getElementById('edImgInput');
   const file = edInput?.files?.[0];
@@ -1422,8 +1456,8 @@ function edExportImg() {
       if(b.rot){ctx.translate(x+w/2,y+h/2);ctx.rotate(b.rot*Math.PI/180);ctx.translate(-(x+w/2),-(y+h/2));}
       ctx.fillStyle='rgba(37,99,235,.15)';ctx.strokeStyle='#2563eb';ctx.lineWidth=Math.max(1.5,cvs.width/800);
       ctx.beginPath();ctx.rect(x,y,w,h);ctx.fill();ctx.stroke();
-      ctx.fillStyle='#2563eb';ctx.font=`600 ${Math.max(9,h*.28)}px "IBM Plex Mono",monospace`;ctx.fillText(hosu,x+3,y+Math.max(9,h*.28)+1);
-      ctx.fillStyle='#1a1c2a';ctx.font=`700 ${Math.max(10,h*.42)}px "Noto Sans KR",sans-serif`;ctx.save();ctx.beginPath();ctx.rect(x+2,y,w-4,h);ctx.clip();ctx.fillText(b.unit?.상호명||hosu,x+3,y+h*.82);ctx.restore();
+      const fs=Math.max(10,h*.42);
+      ctx.fillStyle='#1a1c2a';ctx.font=`700 ${fs}px "Noto Sans KR",sans-serif`;ctx.save();ctx.beginPath();ctx.rect(x+2,y,w-4,h);ctx.clip();ctx.fillText(b.unit?.상호명||hosu,x+3,y+h*0.5+fs*0.35);ctx.restore();
       ctx.restore();
     }
     const a=document.createElement('a');a.download='평면도_상호명.png';a.href=cvs.toDataURL('image/png');a.click();showToast('✅ 이미지 저장 완료');
