@@ -182,11 +182,11 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 .card-floorplan-canvas{width:100%;border-radius:6px;border:1px solid var(--line);background:#f8f9fe;display:block;cursor:pointer}
 .card-floorplan-info{font-size:9px;color:var(--text3);padding:3px 8px 6px;text-align:right}
 /* 고화질 평면도 오버레이 */
-.card-fp-container{position:relative;width:100%;border-radius:6px;border:1px solid var(--line);overflow:hidden;background:#f8f9fe;cursor:pointer;container-type:inline-size}
+.card-fp-container{position:relative;width:100%;border-radius:6px;border:1px solid var(--line);overflow:visible;background:#f8f9fe;cursor:pointer}
 .card-fp-container img{width:100%;display:block;image-rendering:auto}
-.card-fp-box{position:absolute;background:rgba(37,99,235,.15);border:1.5px solid #2563eb;border-radius:2px;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:visible;pointer-events:none}
-.card-fp-box-hosu{font-family:'IBM Plex Mono',monospace;font-weight:600;color:#2563eb;position:absolute;top:4%;left:4%;line-height:1;white-space:nowrap}
-.card-fp-box-name{font-weight:700;color:#1a1c2a;text-align:center;line-height:1.2;white-space:nowrap;max-width:none;padding:1px 3px;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 6px #fff}
+.card-fp-box{position:absolute;background:rgba(37,99,235,.12);border:2px solid #2563eb;border-radius:3px;overflow:visible;pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.card-fp-box .fp-hosu{font-family:'IBM Plex Mono',monospace;font-weight:600;color:#2563eb;position:absolute;top:1px;left:2px;line-height:1;white-space:nowrap}
+.card-fp-box .fp-name{font-weight:700;color:#1a1c2a;text-align:center;line-height:1.2;white-space:nowrap;padding:2px 4px;text-shadow:0 0 4px #fff,0 0 4px #fff,0 0 8px #fff,0 0 8px #fff}
 
 /* Editor Canvas */
 .ed-canvas-area{flex:1;overflow:auto;background:#e8eaf0;background-image:radial-gradient(circle,#c8cde0 1px,transparent 1px);background-size:20px 20px;position:relative}
@@ -659,17 +659,25 @@ function createCard(bName, cardId) {
   let totalRooms=0;
   Object.values(dongs).forEach(fl => Object.values(fl).forEach(rs => totalRooms+=rs.length));
   card.innerHTML=`<div class="card-header" data-drag="true"><div class="card-title-row"><div class="card-building-name">${escHtml(bName)}</div><div class="card-grip"><span></span><span></span><span></span></div></div><div class="card-room-count">전체 ${totalRooms}개 호실</div></div>`;
-  const sNames = Object.keys(dongs).sort();
-  if (sNames.length > 1) {
-    const sb = document.createElement('div'); sb.className='section-tabs';
-    sNames.forEach(s => { const b=document.createElement('button'); b.className='section-tab'+(s===state.section?' active':''); b.textContent=s; b.addEventListener('click',e=>{e.stopPropagation();switchSection(cardId,bName,s);}); sb.appendChild(b); });
-    card.appendChild(sb);
+
+  // 평면도 그룹이 있으면 → 그룹 탭만 표시 (동/층 탭 숨김)
+  const fpGroups = floorplans[bName];
+  const hasFloorplans = fpGroups && typeof fpGroups === 'object' && Object.keys(fpGroups).some(g => fpGroups[g]?.imgDataURL);
+
+  if (!hasFloorplans) {
+    // 평면도 없음 → 기존 동/층 탭
+    const sNames = Object.keys(dongs).sort();
+    if (sNames.length > 1) {
+      const sb = document.createElement('div'); sb.className='section-tabs';
+      sNames.forEach(s => { const b=document.createElement('button'); b.className='section-tab'+(s===state.section?' active':''); b.textContent=s; b.addEventListener('click',e=>{e.stopPropagation();switchSection(cardId,bName,s);}); sb.appendChild(b); });
+      card.appendChild(sb);
+    }
+    const curD = dongs[state.section]||{};
+    const fNames = Object.keys(curD).sort((a,b)=>FLOOR_ORDER(a)-FLOOR_ORDER(b));
+    const fb = document.createElement('div'); fb.className='floor-tabs';
+    fNames.forEach(fl => { const b=document.createElement('button'); b.className='floor-tab'+(fl===state.floor?' active':''); b.textContent=fl; b.addEventListener('click',e=>{e.stopPropagation();switchFloor(cardId,bName,fl);}); fb.appendChild(b); });
+    card.appendChild(fb);
   }
-  const curD = dongs[state.section]||{};
-  const fNames = Object.keys(curD).sort((a,b)=>FLOOR_ORDER(a)-FLOOR_ORDER(b));
-  const fb = document.createElement('div'); fb.className='floor-tabs';
-  fNames.forEach(fl => { const b=document.createElement('button'); b.className='floor-tab'+(fl===state.floor?' active':''); b.textContent=fl; b.addEventListener('click',e=>{e.stopPropagation();switchFloor(cardId,bName,fl);}); fb.appendChild(b); });
-  card.appendChild(fb);
   card.appendChild(buildRoomGrid(cardId,bName));
   card.appendChild(buildFooterStats(bName,state));
   setupCardDrag(card,cardId);
@@ -747,24 +755,32 @@ function buildFloorplanView(bName, fp) {
   img.draggable = false;
   container.appendChild(img);
 
-  // 박스 오버레이 — 글씨 크기를 컨테이너 비례로 (편집기와 동일 비율)
-  for (const [hosu, b] of Object.entries(fp.boxes)) {
-    const box = document.createElement('div'); box.className='card-fp-box';
-    box.style.left=b.x+'%'; box.style.top=b.y+'%'; box.style.width=b.w+'%'; box.style.height=b.h+'%';
-    if(b.rot) box.style.transform=`rotate(${b.rot}deg)`;
-    // 호수: 박스 높이의 28%, 상호명: 42% — cqi = 컨테이너 너비의 1%
-    const fHosu = (b.h * 0.28).toFixed(2);
-    const fName = (b.h * 0.42).toFixed(2);
-    box.innerHTML = `<div class="card-fp-box-hosu" style="font-size:${fHosu}cqi">${hosu}</div><div class="card-fp-box-name" style="font-size:${fName}cqi">${b.name||hosu}</div>`;
-    container.appendChild(box);
-  }
+  // 이미지 로드 후 실제 컨테이너 높이 기준으로 박스+글씨 크기 계산
+  const renderBoxes = () => {
+    container.querySelectorAll('.card-fp-box').forEach(el => el.remove());
+    const cH = container.offsetHeight || 200;
+    for (const [hosu, b] of Object.entries(fp.boxes)) {
+      const box = document.createElement('div'); box.className='card-fp-box';
+      box.style.left=b.x+'%'; box.style.top=b.y+'%'; box.style.width=b.w+'%'; box.style.height=b.h+'%';
+      if(b.rot) box.style.transform=`rotate(${b.rot}deg)`;
+      // 실제 박스 높이(px) 계산 → 편집기 비율 동일하게 폰트 설정
+      const boxPxH = cH * b.h / 100;
+      const fHosu = Math.max(6, boxPxH * 0.26);
+      const fName = Math.max(7, boxPxH * 0.38);
+      box.innerHTML = `<span class="fp-hosu" style="font-size:${fHosu.toFixed(1)}px">${hosu}</span><span class="fp-name" style="font-size:${fName.toFixed(1)}px">${b.name||hosu}</span>`;
+      container.appendChild(box);
+    }
+  };
+  img.onload = renderBoxes;
+  // 폴백: 이미 캐싱된 이미지
+  if (img.complete) requestAnimationFrame(renderBoxes);
 
   container.title = '클릭하면 편집';
   container.addEventListener('click', () => { edLoadBuildingByName(bName); switchPage('editor'); });
   wrap.appendChild(container);
 
   const info = document.createElement('div'); info.className='card-floorplan-info';
-  info.textContent = `${fp.groupName||fp.dong||''} ${fp.floor||''} • 배치 ${boxCount}개 — 클릭하면 편집`;
+  info.textContent = `${fp.groupName||''} • 배치 ${boxCount}개 — 클릭하면 편집`;
   wrap.appendChild(info);
   return wrap;
 }
