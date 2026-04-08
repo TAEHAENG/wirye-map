@@ -182,11 +182,11 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 .card-floorplan-canvas{width:100%;border-radius:6px;border:1px solid var(--line);background:#f8f9fe;display:block;cursor:pointer}
 .card-floorplan-info{font-size:9px;color:var(--text3);padding:3px 8px 6px;text-align:right}
 /* 고화질 평면도 오버레이 */
-.card-fp-container{position:relative;width:100%;border-radius:6px;border:1px solid var(--line);overflow:hidden;background:#f8f9fe;cursor:pointer}
+.card-fp-container{position:relative;width:100%;border-radius:6px;border:1px solid var(--line);overflow:hidden;background:#f8f9fe;cursor:pointer;container-type:inline-size}
 .card-fp-container img{width:100%;display:block;image-rendering:auto}
-.card-fp-box{position:absolute;background:rgba(37,99,235,.15);border:1.5px solid #2563eb;border-radius:2px;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;pointer-events:none}
-.card-fp-box-hosu{font-family:'IBM Plex Mono',monospace;font-size:8px;font-weight:600;color:#2563eb;position:absolute;top:1px;left:2px;line-height:1}
-.card-fp-box-name{font-size:10px;font-weight:700;color:#1a1c2a;text-align:center;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;padding:1px 3px;text-shadow:0 0 3px #fff,0 0 3px #fff}
+.card-fp-box{position:absolute;background:rgba(37,99,235,.15);border:1.5px solid #2563eb;border-radius:2px;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:visible;pointer-events:none}
+.card-fp-box-hosu{font-family:'IBM Plex Mono',monospace;font-weight:600;color:#2563eb;position:absolute;top:4%;left:4%;line-height:1;white-space:nowrap}
+.card-fp-box-name{font-weight:700;color:#1a1c2a;text-align:center;line-height:1.2;white-space:nowrap;max-width:none;padding:1px 3px;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 6px #fff}
 
 /* Editor Canvas */
 .ed-canvas-area{flex:1;overflow:auto;background:#e8eaf0;background-image:radial-gradient(circle,#c8cde0 1px,transparent 1px);background-size:20px 20px;position:relative}
@@ -475,14 +475,14 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 // COMMON STATE & CONFIG
 // ═══════════════════════════════════════════════
 const STORAGE_KEY      = 'wirye_map_layout_v2';
-const FLOORPLAN_KEY    = 'wirye_floorplans_v1'; // 건물별 평면도 저장
+const FLOORPLAN_KEY    = 'wirye_floorplans_v2'; // 건물별 그룹명별 평면도 저장
 const SHEET_ID  = '19KWBXPiK-qXycopkNRHNMddmux2cKohtm7fLLyfiZGw';
 const SHEET_GID = '805020193';
 
 let buildings = {};   // { bName: { dong: { floor: [rooms] } } }
 let cardStates = {};
 let positions = {};
-let floorplans = {};  // { bName: { boxes:{}, dong, floor, imgDataURL } }
+let floorplans = {};  // { bName: { groupName: { boxes, imgDataURL, ... } } }
 let zoomScale = 1.0;
 let panOffset = { x: 80, y: 80 };
 let isPanning = false, panStart = { x: 0, y: 0 };
@@ -620,7 +620,16 @@ function initMap() {
 
 function loadPositions() {
   try { const s = localStorage.getItem(STORAGE_KEY); if (s) positions = JSON.parse(s); } catch(e) { positions = {}; }
-  try { const f = localStorage.getItem(FLOORPLAN_KEY); if (f) floorplans = JSON.parse(f); } catch(e) { floorplans = {}; }
+  try {
+    const f = localStorage.getItem(FLOORPLAN_KEY); if (f) floorplans = JSON.parse(f);
+    // v1→v2 마이그레이션: 구 형식(boxes가 바로 있는 경우) → 그룹명별 구조로 변환
+    for (const [bName, val] of Object.entries(floorplans)) {
+      if (val && val.boxes && val.imgDataURL) {
+        const gName = val.groupName || val.floor || '1층';
+        floorplans[bName] = { [gName]: val };
+      }
+    }
+  } catch(e) { floorplans = {}; }
 }
 function savePositions() { localStorage.setItem(STORAGE_KEY, JSON.stringify(positions)); showToast('✅ 배치 저장 완료'); }
 function getDefaultPosition(idx) { const c = idx % 3; const r = Math.floor(idx / 3); return { x: 40 + c*350, y: 40 + r*480 }; }
@@ -668,10 +677,15 @@ function createCard(bName, cardId) {
 }
 
 function buildRoomGrid(cardId,bName) {
-  // 저장된 평면도가 있으면 해당 카드에 평면도 렌더
-  const fp = floorplans[bName];
-  if (fp && fp.boxes && fp.imgDataURL && !searchQuery && !vacantOnly) {
-    return buildFloorplanView(bName, fp);
+  // 저장된 평면도가 있으면 해당 카드에 그룹별 평면도 렌더
+  const fpGroups = floorplans[bName];
+  if (fpGroups && typeof fpGroups === 'object' && !searchQuery && !vacantOnly) {
+    const groupNames = Object.keys(fpGroups).filter(g => fpGroups[g]?.imgDataURL);
+    if (groupNames.length > 0) {
+      const activeGroup = cardStates[cardId]?.fpGroup || groupNames[0];
+      const fp = fpGroups[activeGroup] || fpGroups[groupNames[0]];
+      if (fp) return buildFloorplanGroupView(bName, cardId, fpGroups, groupNames, activeGroup);
+    }
   }
 
   const state=cardStates[cardId], rooms=(buildings[bName][state.section]||{})[state.floor]||[];
@@ -697,6 +711,30 @@ function buildRoomGrid(cardId,bName) {
   wrap.appendChild(grid); return wrap;
 }
 
+// 전체지도 카드 — 그룹 탭 + 평면도
+function buildFloorplanGroupView(bName, cardId, fpGroups, groupNames, activeGroup) {
+  const outer = document.createElement('div');
+  // 그룹 탭 (2개 이상일 때만 표시)
+  if (groupNames.length > 1) {
+    const tabs = document.createElement('div'); tabs.className='floor-tabs';
+    groupNames.forEach(g => {
+      const btn = document.createElement('button');
+      btn.className = 'floor-tab' + (g === activeGroup ? ' active' : '');
+      btn.textContent = g;
+      btn.addEventListener('click', ev => {
+        ev.stopPropagation();
+        cardStates[cardId].fpGroup = g;
+        rebuildCard(cardId, bName);
+      });
+      tabs.appendChild(btn);
+    });
+    outer.appendChild(tabs);
+  }
+  const fp = fpGroups[activeGroup];
+  if (fp) outer.appendChild(buildFloorplanView(bName, fp));
+  return outer;
+}
+
 // 전체지도 카드 내 평면도 미니 뷰 (고화질 — 원본 이미지 + CSS 오버레이)
 function buildFloorplanView(bName, fp) {
   const wrap = document.createElement('div'); wrap.className='card-floorplan-wrap';
@@ -709,12 +747,15 @@ function buildFloorplanView(bName, fp) {
   img.draggable = false;
   container.appendChild(img);
 
-  // 박스 오버레이 (CSS, 벡터 — 확대해도 선명)
+  // 박스 오버레이 — 글씨 크기를 컨테이너 비례로 (편집기와 동일 비율)
   for (const [hosu, b] of Object.entries(fp.boxes)) {
     const box = document.createElement('div'); box.className='card-fp-box';
     box.style.left=b.x+'%'; box.style.top=b.y+'%'; box.style.width=b.w+'%'; box.style.height=b.h+'%';
     if(b.rot) box.style.transform=`rotate(${b.rot}deg)`;
-    box.innerHTML = `<div class="card-fp-box-hosu">${hosu}</div><div class="card-fp-box-name">${b.name||hosu}</div>`;
+    // 호수: 박스 높이의 28%, 상호명: 42% — cqi = 컨테이너 너비의 1%
+    const fHosu = (b.h * 0.28).toFixed(2);
+    const fName = (b.h * 0.42).toFixed(2);
+    box.innerHTML = `<div class="card-fp-box-hosu" style="font-size:${fHosu}cqi">${hosu}</div><div class="card-fp-box-name" style="font-size:${fName}cqi">${b.name||hosu}</div>`;
     container.appendChild(box);
   }
 
@@ -983,31 +1024,112 @@ function edLoadBuilding() {
   })).filter(u => u.호수);
 
   edActiveDong = '전체';
-  // 저장된 평면도 박스 복원
-  const saved = floorplans[bName];
-  if (saved && saved.boxes) {
-    const uMap = Object.fromEntries(edUnits.map(u=>[u.호수,u]));
-    edBoxes = {};
-    for (const [hosu,b] of Object.entries(saved.boxes)) {
-      const unit = uMap[hosu]; if (unit) edBoxes[hosu]={...b,unit};
-    }
-    // 저장된 그룹명 복원
-    if (saved.groupName) {
-      edGroupNameVal = saved.groupName;
-      const inp = document.getElementById('edGroupName');
-      if (inp) inp.value = saved.groupName;
-    }
-    showToast(`✅ ${bName} — ${edUnits.length}개 호실 (저장 레이아웃 복원)`);
+  edBoxes = {};
+  edGroupNameVal = '';
+  const inp = document.getElementById('edGroupName');
+  if (inp) inp.value = '';
+
+  // 그룹명별 저장 목록 렌더
+  edRenderGroupTabs(bName);
+
+  // 첫 번째 저장 그룹 자동 로드
+  const fpGroups = floorplans[bName];
+  if (fpGroups && typeof fpGroups === 'object') {
+    const firstGroup = Object.keys(fpGroups)[0];
+    if (firstGroup) edLoadGroup(bName, firstGroup);
+    else showToast(`✅ ${bName} — ${edUnits.length}개 호실 로드`);
   } else {
-    edBoxes = {};
-    edGroupNameVal = '';
-    const inp = document.getElementById('edGroupName');
-    if (inp) inp.value = '';
     showToast(`✅ ${bName} — ${edUnits.length}개 호실 로드`);
   }
+
   edSelectedUnit = null;
   edRenderDongTabs();
   edRenderUnitList();
+}
+
+// ── 그룹 탭 렌더 (편집기 사이드바) ──
+function edRenderGroupTabs(bName) {
+  let container = document.getElementById('edGroupTabs');
+  if (!container) {
+    // 그룹 탭 컨테이너 생성 (그룹명 입력란 앞에 삽입)
+    container = document.createElement('div');
+    container.id = 'edGroupTabs';
+    container.className = 'ed-dong-tabs';
+    container.style.borderBottom = '1px solid var(--line)';
+    const cfg = document.getElementById('edGroupCfg');
+    cfg.parentElement.insertBefore(container, cfg);
+  }
+  container.innerHTML = '';
+  const fpGroups = floorplans[bName];
+  if (!fpGroups || typeof fpGroups !== 'object') { container.style.display='none'; return; }
+  const groupNames = Object.keys(fpGroups);
+  if (groupNames.length === 0) { container.style.display='none'; return; }
+  container.style.display = '';
+
+  // 새 그룹(+) 버튼
+  groupNames.forEach(g => {
+    const btn = document.createElement('button');
+    btn.className = 'ed-dong-tab' + (g === edGroupNameVal ? ' active' : '');
+    btn.textContent = g;
+    btn.addEventListener('click', () => edLoadGroup(bName, g));
+    container.appendChild(btn);
+  });
+  const addBtn = document.createElement('button');
+  addBtn.className = 'ed-dong-tab';
+  addBtn.textContent = '+ 새 그룹';
+  addBtn.style.color = 'var(--blue)';
+  addBtn.addEventListener('click', () => {
+    edBoxes = {};
+    edGroupNameVal = '';
+    edImageURL = '';
+    document.getElementById('edGroupName').value = '';
+    document.getElementById('ed-floorplan-img').src = '';
+    document.getElementById('edDropzone').classList.remove('has-file');
+    document.getElementById('edCanvasScroller').style.display = 'none';
+    document.getElementById('edZoomBar').style.display = 'none';
+    edRenderAllBoxes(); edRenderUnitList();
+    edRenderGroupTabs(bName);
+    showToast('새 그룹 — 그룹명을 입력하고 이미지를 업로드하세요');
+  });
+  container.appendChild(addBtn);
+}
+
+// 특정 그룹 로드 (이미지 + 박스 복원)
+function edLoadGroup(bName, gName) {
+  const fpGroups = floorplans[bName];
+  if (!fpGroups || !fpGroups[gName]) return;
+  const saved = fpGroups[gName];
+
+  edGroupNameVal = gName;
+  document.getElementById('edGroupName').value = gName;
+
+  // 박스 복원
+  const uMap = Object.fromEntries(edUnits.map(u=>[u.호수,u]));
+  edBoxes = {};
+  if (saved.boxes) {
+    for (const [hosu,b] of Object.entries(saved.boxes)) {
+      const unit = uMap[hosu]; if (unit) edBoxes[hosu]={...b,unit};
+    }
+  }
+
+  // 이미지 복원
+  if (saved.imgDataURL) {
+    edImageURL = saved.imgDataURL;
+    document.getElementById('edDropzone').classList.add('has-file');
+    document.getElementById('edCanvasScroller').style.display = '';
+    document.getElementById('edZoomBar').style.display = '';
+    const img = document.getElementById('ed-floorplan-img');
+    img.src = saved.imgDataURL;
+    img.onload = () => {
+      edImgNW = img.naturalWidth; edImgNH = img.naturalHeight;
+      edApplyZoom(); edRenderAllBoxes(); edUpdateAlignGuide();
+    };
+    document.getElementById('edCanvasWrapper').addEventListener('click', edOnCanvasClick);
+  }
+
+  edRenderGroupTabs(bName);
+  edRenderUnitList();
+  showToast(`✅ "${gName}" 그룹 로드 (${Object.keys(edBoxes).length}개 박스)`);
 }
 
 // 전체지도 카드에서 건물명으로 직접 로드
@@ -1130,7 +1252,14 @@ function edStartDrag(e) {
   const sd={hosu,el,sx:e.clientX,sy:e.clientY,ox:b.x,oy:b.y};
   const move=ev=>{
     const dx=(ev.clientX-sd.sx)/(edImgNW*edZoom)*100,dy=(ev.clientY-sd.sy)/(edImgNH*edZoom)*100;
-    const nx=Math.max(0,Math.min(95,sd.ox+dx)), ny=Math.max(0,Math.min(95,sd.oy+dy));
+    let nx=Math.max(0,Math.min(95,sd.ox+dx)), ny=Math.max(0,Math.min(95,sd.oy+dy));
+    // 상자 설정 모드: 드래그 중에도 축 고정
+    if(edBoxMode && edAxisXOn){
+      nx = edAxisXAnchor==='left' ? edAxisXPos : Math.max(0, edAxisXPos - b.w);
+    }
+    if(edBoxMode && edAxisYOn){
+      ny = edAxisYAnchor==='top' ? edAxisYPos : Math.max(0, edAxisYPos - b.h);
+    }
     edBoxes[sd.hosu].x=nx;edBoxes[sd.hosu].y=ny;
     sd.el.style.left=nx+'%';sd.el.style.top=ny+'%';
   };
@@ -1188,37 +1317,37 @@ function edClearBuildingBoxes(){
   showToast(`✅ ${bName} 초기화 완료`);
 }
 
-// 지도에 저장 — 원본 화질 그대로 유지
+// 지도에 저장 — 그룹명별 저장
 function edSaveToMap(){
   const bName = document.getElementById('edBuildingSelect').value;
   if(!bName){showToast('건물을 먼저 선택하세요');return;}
   if(!Object.keys(edBoxes).length){showToast('배치된 호수가 없습니다');return;}
   if(!edImageURL){showToast('평면도 이미지를 업로드하세요');return;}
+  if(!edGroupNameVal){showToast('그룹(층) 이름을 먼저 지정하세요');return;}
 
-  const state = cardStates['card_'+btoa(encodeURIComponent(bName)).replace(/[^a-zA-Z0-9]/g,'_')] || {};
+  const gName = edGroupNameVal;
   const boxData = Object.fromEntries(Object.entries(edBoxes).map(([k,v])=>[k,{x:v.x,y:v.y,w:v.w,h:v.h,rot:v.rot||0,name:v.unit?.상호명||''}]));
 
-  // 원본 파일에서 직접 dataURL 읽어 화질 손실 제로
   const edInput = document.getElementById('edImgInput');
   const file = edInput?.files?.[0];
-  
+
   function doSave(imgDataURL) {
-    floorplans[bName] = {
+    if (!floorplans[bName]) floorplans[bName] = {};
+    floorplans[bName][gName] = {
       boxes: boxData,
-      dong: state.section||'',
-      floor: state.floor||'',
-      groupName: edGroupNameVal || '',
+      groupName: gName,
       imgDataURL,
       savedAt: new Date().toISOString()
     };
     try {
       localStorage.setItem(FLOORPLAN_KEY, JSON.stringify(floorplans));
-      showToast(`\u2705 '${bName}' \ud3c9\uba74\ub3c4 \uc800\uc7a5 \uc644\ub8cc`);
+      showToast(`✅ '${bName}/${gName}' 평면도 저장 완료`);
       const cid = 'card_'+btoa(encodeURIComponent(bName)).replace(/[^a-zA-Z0-9]/g,'_');
       rebuildCard(cid, bName);
+      edRenderGroupTabs(bName);
     } catch(e) {
       // localStorage \uc6a9\ub7c9 \ucd08\uacfc \uc2dc: \ub2e8\uacc4\uc801 \ud488\uc9c8 \uc800\ud558
-      tryCompressedSave(imgDataURL, bName, boxData, state);
+      tryCompressedSave(imgDataURL, bName, boxData);
     }
   }
 
@@ -1239,7 +1368,7 @@ function edSaveToMap(){
   }
 }
 
-function tryCompressedSave(originalURL, bName, boxData, state) {
+function tryCompressedSave(originalURL, bName, boxData) {
   const img2 = new Image();
   img2.onload = () => {
     const steps = [
@@ -1254,7 +1383,8 @@ function tryCompressedSave(originalURL, bName, boxData, state) {
       c.width = Math.round(img2.naturalWidth*sc); c.height = Math.round(img2.naturalHeight*sc);
       c.getContext('2d').drawImage(img2, 0, 0, c.width, c.height);
       const url = c.toDataURL('image/jpeg', q);
-      floorplans[bName] = { boxes:boxData, dong:state.section||'', floor:state.floor||'', groupName:edGroupNameVal||'', imgDataURL:url, savedAt:new Date().toISOString() };
+      if (!floorplans[bName]) floorplans[bName] = {};
+      floorplans[bName][edGroupNameVal||'1층'] = { boxes:boxData, groupName:edGroupNameVal||'1층', imgDataURL:url, savedAt:new Date().toISOString() };
       try { localStorage.setItem(FLOORPLAN_KEY, JSON.stringify(floorplans)); showToast(`\u2705 \uc800\uc7a5 \uc644\ub8cc (${Math.round(sc*100)}% \ud06c\uae30)`); const cid='card_'+btoa(encodeURIComponent(bName)).replace(/[^a-zA-Z0-9]/g,'_'); rebuildCard(cid,bName); return; } catch(e){}
     }
     showToast('\u274c \uc800\uc7a5 \uc2e4\ud328 (\uc0ac\uc6a9 \uac00\ub2a5\ud55c \uacf5\uac04 \ubd80\uc871)');
