@@ -185,7 +185,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 .card-fp-container{position:relative;width:100%;border-radius:6px;border:1px solid var(--line);overflow:visible;background:#f8f9fe;cursor:pointer}
 .card-fp-container img{width:100%;display:block;image-rendering:auto}
 .card-fp-box{position:absolute;background:rgba(37,99,235,.12);border:2px solid #2563eb;border-radius:3px;overflow:hidden;pointer-events:auto;display:flex;align-items:center;cursor:pointer}
-.card-fp-box .fp-name{font-weight:700;color:#1a1c2a;text-align:left;line-height:1.2;white-space:nowrap;padding:2px 4px;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 6px #fff;pointer-events:none}
+.card-fp-box .fp-name{font-weight:700;color:#1a1c2a;text-align:left;line-height:1.2;white-space:nowrap;padding:2px 4px;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 6px #fff;pointer-events:none;width:100%;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis}
 
 /* Editor Canvas */
 .ed-canvas-area{flex:1;overflow:auto;background:#e8eaf0;background-image:radial-gradient(circle,#c8cde0 1px,transparent 1px);background-size:20px 20px;position:relative}
@@ -204,13 +204,15 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 .obox:hover{box-shadow:0 0 0 3px rgba(37,99,235,.25)}
 .obox.obox-selected{background:rgba(37,99,235,.22);border-color:#1d4ed8;box-shadow:0 0 0 3px rgba(37,99,235,.3)}
 .obox-hosu{display:none}
-.obox-name{font-size:11px;font-weight:700;color:#1a1c2a;text-align:left;padding:2px 6px;line-height:1.2;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none}
-.obox-del{position:absolute;top:-7px;right:-7px;width:15px;height:15px;background:var(--red);color:#fff;border-radius:50%;font-size:8px;display:none;align-items:center;justify-content:center;cursor:pointer;z-index:20;font-weight:900;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.obox-name{font-size:11px;font-weight:700;color:#1a1c2a;text-align:left;padding:2px 6px;line-height:1.2;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;box-sizing:border-box}
+.obox-del{position:absolute;top:-10px;right:-10px;width:20px;height:20px;background:var(--red);color:#fff;border-radius:50%;font-size:10px;display:none;align-items:center;justify-content:center;cursor:pointer;z-index:20;font-weight:900;box-shadow:0 2px 6px rgba(0,0,0,.3);border:2px solid #fff}
 .obox:hover .obox-del-old{display:flex}
 .obox-resize{position:absolute;bottom:0;right:0;width:10px;height:10px;cursor:se-resize;background:var(--blue);opacity:.7;border-radius:1px 0 0 0}
-.obox-rotate{position:absolute;top:-7px;right:-7px;width:16px;height:16px;background:var(--amber);color:#fff;border-radius:50%;font-size:9px;display:none;align-items:center;justify-content:center;cursor:grab;z-index:20;box-shadow:0 1px 4px rgba(0,0,0,.2);line-height:1}
+.obox-rotate{position:absolute;top:-12px;right:-12px;width:24px;height:24px;background:var(--amber);color:#fff;border-radius:50%;font-size:13px;display:none;align-items:center;justify-content:center;cursor:grab;z-index:20;box-shadow:0 2px 6px rgba(0,0,0,.3);line-height:1;border:2px solid #fff;font-weight:700}
 .obox:hover .obox-rotate{display:flex}
-.obox:hover .obox-del{display:flex;top:-7px;right:auto;left:-7px}
+.obox-rotate-label{position:absolute;top:-24px;right:-8px;font-size:9px;color:var(--amber);font-weight:700;white-space:nowrap;pointer-events:none;display:none;background:#fff;padding:1px 4px;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.obox:hover .obox-rotate-label{display:block}
+.obox:hover .obox-del{display:flex;top:-10px;right:auto;left:-10px}
 
 .placing-hint{position:fixed;top:72px;left:50%;transform:translateX(-50%);background:var(--blue);color:#fff;padding:8px 22px;border-radius:24px;font-size:12px;font-weight:600;pointer-events:none;z-index:200;opacity:0;transition:opacity .25s;box-shadow:0 4px 16px rgba(37,99,235,.35);white-space:nowrap}
 .placing-hint.visible{opacity:1}
@@ -379,11 +381,22 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
       <!-- 그룹명(층명) 지정 -->
       <div class="ed-place-cfg" id="edGroupCfg">
         <div class="ed-place-cfg-row">
-          <span class="ed-place-cfg-label">그룹(층)</span>
+          <span class="ed-place-cfg-label" style="font-weight:700">그룹(층)</span>
           <input id="edGroupName" class="topbar-search" style="max-width:none;height:28px;flex:1;font-size:11px" placeholder="예: 1층, 지하1층…">
-          <button class="btn primary" style="font-size:10px;height:28px;padding:0 8px" onclick="edApplyGroupName()">적용</button>
+          <button class="btn primary" style="font-size:10px;height:28px;padding:0 8px" onclick="edApplyGroup()">적용</button>
         </div>
-        <div style="font-size:10px;color:var(--text3);padding:0 2px">동 구분 없이 하나의 평면도로 그룹화. 전체지도에서 이 이름으로 층 탭 표시</div>
+        <!-- 동 선택 체크박스 -->
+        <div style="font-size:10px;color:var(--text2);padding:2px 2px 0;font-weight:600">동 선택</div>
+        <div id="edGroupDongChecks" style="display:flex;flex-wrap:wrap;gap:4px;padding:2px 2px 4px"></div>
+        <!-- 호수 범위 선택 -->
+        <div style="font-size:10px;color:var(--text2);padding:2px 2px 0;font-weight:600">호수 범위</div>
+        <div style="display:flex;align-items:center;gap:4px;padding:2px 2px 4px">
+          <input id="edGroupHoFrom" class="topbar-search" style="max-width:none;height:26px;flex:1;font-size:11px;text-align:center" placeholder="시작 호수">
+          <span style="font-size:10px;color:var(--text3)">~</span>
+          <input id="edGroupHoTo" class="topbar-search" style="max-width:none;height:26px;flex:1;font-size:11px;text-align:center" placeholder="끝 호수">
+          <button class="btn" style="font-size:9px;height:26px;padding:0 6px;white-space:nowrap" onclick="edClearGroupRange()">초기화</button>
+        </div>
+        <div style="font-size:9px;color:var(--text3);padding:0 2px">그룹명 + 동/호수 범위를 지정한 뒤 '적용'을 누르면 해당 호실만 표시됩니다</div>
       </div>
       <!-- 상호명 상자 설정 모드 -->
       <div class="ed-place-cfg" id="edBoxModeCfg">
@@ -422,8 +435,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
           <!-- 각도 -->
           <div class="ed-place-cfg-row">
             <span class="ed-place-cfg-label">각도</span>
-            <span id="edBoxModeAngleLabel" style="font-size:11px;color:var(--text2);font-family:'IBM Plex Mono',monospace">0°</span>
-            <span style="font-size:9px;color:var(--text3);margin-left:4px">첫 박스 각도 기준 자동 적용</span>
+            <input type="number" id="edBoxModeAngleInput" value="0" step="5" min="-360" max="360" style="width:56px;height:26px;font-size:11px;text-align:center;border:1.5px solid var(--line);border-radius:5px;font-family:'IBM Plex Mono',monospace;padding:0 4px" onchange="edSetAngleFromInput()">
+            <span style="font-size:10px;color:var(--text3)">°</span>
+            <span style="font-size:9px;color:var(--text3);margin-left:4px">회전 손잡이 또는 직접 입력</span>
           </div>
         </div>
       </div>
@@ -968,17 +982,99 @@ function edUpdateAxisUI() {
   yBtn.classList.toggle('primary', edAxisYOn);
   ySeg.style.display = edAxisYOn ? '' : 'none';
 
-  const aLbl = document.getElementById('edBoxModeAngleLabel');
-  if (aLbl) aLbl.textContent = edBoxModeRot + '°';
+  const aInp = document.getElementById('edBoxModeAngleInput');
+  if (aInp) aInp.value = edBoxModeRot;
 }
 
-// 그룹명(층명) 적용
-function edApplyGroupName() {
+function edSetAngleFromInput() {
+  const v = parseInt(document.getElementById('edBoxModeAngleInput').value) || 0;
+  edBoxModeRot = v;
+  edBoxModeRotSet = true;
+}
+
+// 그룹 필터링 상태
+let edGroupDongs = [];     // 선택된 동 목록
+let edGroupHoFrom = '';    // 호수 시작
+let edGroupHoTo = '';      // 호수 끝
+let edFilteredUnits = [];  // 그룹 필터 적용된 유닛 목록
+
+// 동 체크박스 렌더
+function edRenderGroupDongChecks() {
+  const container = document.getElementById('edGroupDongChecks');
+  container.innerHTML = '';
+  const dongs = [...new Set(edUnits.map(u => u.동).filter(Boolean))];
+  if (dongs.length === 0) { container.innerHTML = '<span style="font-size:9px;color:var(--text3)">(동 구분 없음)</span>'; return; }
+  dongs.forEach(d => {
+    const lbl = document.createElement('label');
+    lbl.style.cssText = 'display:flex;align-items:center;gap:3px;font-size:11px;cursor:pointer;padding:2px 6px;border:1.5px solid var(--line);border-radius:12px;white-space:nowrap;user-select:none';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.value = d;
+    cb.checked = edGroupDongs.includes(d);
+    cb.style.cssText = 'margin:0;width:13px;height:13px;cursor:pointer';
+    cb.addEventListener('change', () => {
+      if (cb.checked) { if (!edGroupDongs.includes(d)) edGroupDongs.push(d); }
+      else { edGroupDongs = edGroupDongs.filter(x => x !== d); }
+      edUpdateGroupDongStyle();
+    });
+    lbl.appendChild(cb);
+    lbl.appendChild(document.createTextNode(d));
+    container.appendChild(lbl);
+  });
+  edUpdateGroupDongStyle();
+}
+
+function edUpdateGroupDongStyle() {
+  const labels = document.getElementById('edGroupDongChecks').querySelectorAll('label');
+  labels.forEach(lbl => {
+    const cb = lbl.querySelector('input');
+    if (cb.checked) { lbl.style.borderColor = 'var(--blue)'; lbl.style.background = 'var(--blue-light)'; lbl.style.color = 'var(--blue)'; lbl.style.fontWeight = '600'; }
+    else { lbl.style.borderColor = 'var(--line)'; lbl.style.background = ''; lbl.style.color = ''; lbl.style.fontWeight = ''; }
+  });
+}
+
+function edClearGroupRange() {
+  document.getElementById('edGroupHoFrom').value = '';
+  document.getElementById('edGroupHoTo').value = '';
+  edGroupHoFrom = ''; edGroupHoTo = '';
+}
+
+// 호수에서 숫자 추출 (연속 선택용)
+function edExtractHoNum(ho) {
+  const m = String(ho).match(/\d+/);
+  return m ? parseInt(m[0]) : 0;
+}
+
+// 그룹 적용: 그룹명 + 동/호수 필터 → 유닛 리스트 갱신
+function edApplyGroup() {
   const inp = document.getElementById('edGroupName');
   edGroupNameVal = (inp.value || '').trim();
   if (!edGroupNameVal) { showToast('그룹(층) 이름을 입력하세요'); return; }
-  showToast(`✅ 그룹명 "${edGroupNameVal}" 적용됨`);
+
+  edGroupHoFrom = (document.getElementById('edGroupHoFrom').value || '').trim();
+  edGroupHoTo = (document.getElementById('edGroupHoTo').value || '').trim();
+
+  // 필터 적용
+  edFilteredUnits = edUnits.filter(u => {
+    // 동 필터
+    if (edGroupDongs.length > 0 && u.동 && !edGroupDongs.includes(u.동)) return false;
+    // 호수 범위 필터
+    if (edGroupHoFrom || edGroupHoTo) {
+      const num = edExtractHoNum(u.호수);
+      const from = edGroupHoFrom ? edExtractHoNum(edGroupHoFrom) : 0;
+      const to = edGroupHoTo ? edExtractHoNum(edGroupHoTo) : Infinity;
+      if (num < from || num > to) return false;
+    }
+    return true;
+  });
+
+  edActiveDong = '전체';
+  edRenderDongTabs();
+  edRenderUnitList();
+  showToast(`✅ 그룹 "${edGroupNameVal}" 적용 — ${edFilteredUnits.length}개 호실`);
 }
+
+// 구 edApplyGroupName 호환
+function edApplyGroupName() { edApplyGroup(); }
 
 // ── 정렬 가이드라인 렌더 ──
 function edUpdateAlignGuide() {
@@ -1074,8 +1170,15 @@ function edLoadBuilding() {
   edActiveDong = '전체';
   edBoxes = {};
   edGroupNameVal = '';
+  edGroupDongs = [];
+  edGroupHoFrom = ''; edGroupHoTo = '';
+  edFilteredUnits = [];
   const inp = document.getElementById('edGroupName');
   if (inp) inp.value = '';
+  edClearGroupRange();
+
+  // 동 체크박스 렌더
+  edRenderGroupDongChecks();
 
   // 그룹명별 저장 목록 렌더
   edRenderGroupTabs(bName);
@@ -1135,9 +1238,14 @@ function edRenderGroupTabs(bName) {
     document.getElementById('edDropzone').classList.remove('has-file');
     document.getElementById('edCanvasScroller').style.display = 'none';
     document.getElementById('edZoomBar').style.display = 'none';
-    edRenderAllBoxes(); edRenderUnitList();
+    edGroupDongs = []; edGroupHoFrom = ''; edGroupHoTo = '';
+    edFilteredUnits = [];
+    edClearGroupRange();
+    edRenderGroupDongChecks();
+    edActiveDong = '전체';
+    edRenderAllBoxes(); edRenderDongTabs(); edRenderUnitList();
     edRenderGroupTabs(bName);
-    showToast('새 그룹 — 그룹명을 입력하고 이미지를 업로드하세요');
+    showToast('새 그룹 — 그룹명과 범위를 지정하고 이미지를 업로드하세요');
   });
   container.appendChild(addBtn);
 }
@@ -1150,6 +1258,25 @@ function edLoadGroup(bName, gName) {
 
   edGroupNameVal = gName;
   document.getElementById('edGroupName').value = gName;
+
+  // 그룹 필터 복원
+  edGroupDongs = saved.groupDongs || [];
+  edGroupHoFrom = saved.groupHoFrom || '';
+  edGroupHoTo = saved.groupHoTo || '';
+  document.getElementById('edGroupHoFrom').value = edGroupHoFrom;
+  document.getElementById('edGroupHoTo').value = edGroupHoTo;
+  edRenderGroupDongChecks();
+  // 필터 재적용
+  edFilteredUnits = edUnits.filter(u => {
+    if (edGroupDongs.length > 0 && u.동 && !edGroupDongs.includes(u.동)) return false;
+    if (edGroupHoFrom || edGroupHoTo) {
+      const num = edExtractHoNum(u.호수);
+      const from = edGroupHoFrom ? edExtractHoNum(edGroupHoFrom) : 0;
+      const to = edGroupHoTo ? edExtractHoNum(edGroupHoTo) : Infinity;
+      if (num < from || num > to) return false;
+    }
+    return true;
+  });
 
   // 박스 복원
   const uMap = Object.fromEntries(edUnits.map(u=>[u.호수,u]));
@@ -1172,10 +1299,13 @@ function edLoadGroup(bName, gName) {
       edImgNW = img.naturalWidth; edImgNH = img.naturalHeight;
       edApplyZoom(); edRenderAllBoxes(); edUpdateAlignGuide();
     };
+    document.getElementById('edCanvasWrapper').removeEventListener('click', edOnCanvasClick);
     document.getElementById('edCanvasWrapper').addEventListener('click', edOnCanvasClick);
   }
 
+  edActiveDong = '전체';
   edRenderGroupTabs(bName);
+  edRenderDongTabs();
   edRenderUnitList();
   showToast(`✅ "${gName}" 그룹 로드 (${Object.keys(edBoxes).length}개 박스)`);
 }
@@ -1207,8 +1337,13 @@ function edHandleImage(input) {
 }
 
 // ── 동 탭 ──
+function edGetBaseUnits() {
+  return edFilteredUnits.length > 0 ? edFilteredUnits : edUnits;
+}
+
 function edRenderDongTabs() {
-  const ds = ['전체', ...new Set(edUnits.map(u=>u.동).filter(Boolean))];
+  const base = edGetBaseUnits();
+  const ds = ['전체', ...new Set(base.map(u=>u.동).filter(Boolean))];
   const c = document.getElementById('edDongTabs'); c.innerHTML = '';
   ds.forEach(d => { const b=document.createElement('button'); b.className='ed-dong-tab'+(d===edActiveDong?' active':''); b.textContent=d||'(동 없음)'; b.addEventListener('click',()=>{edActiveDong=d;edRenderDongTabs();edRenderUnitList();}); c.appendChild(b); });
 }
@@ -1218,7 +1353,8 @@ function edRenderUnitList() {
   const list = document.getElementById('edUnitList');
   const q = (document.getElementById('edUnitSearch').value||'').trim().toLowerCase();
   list.innerHTML = '';
-  let fr = edActiveDong === '전체' ? edUnits : edUnits.filter(u=>u.동===edActiveDong);
+  const base = edGetBaseUnits();
+  let fr = edActiveDong === '전체' ? base : base.filter(u=>u.동===edActiveDong);
   if (q) fr = fr.filter(u=>u.호수.toLowerCase().includes(q)||u.상호명.toLowerCase().includes(q));
   fr.forEach(u => {
     const placed = !!edBoxes[u.호수], isSel = edSelectedUnit?.호수===u.호수;
@@ -1228,7 +1364,8 @@ function edRenderUnitList() {
     row.addEventListener('click', () => edSelectUnit(u));
     list.appendChild(row);
   });
-  document.getElementById('edPlacedPill').textContent = `${Object.keys(edBoxes).length} / ${edUnits.length}`;
+  const baseLen = edGetBaseUnits().length;
+  document.getElementById('edPlacedPill').textContent = `${Object.keys(edBoxes).length} / ${baseLen}`;
 }
 
 function edSelectUnit(u) {
@@ -1245,7 +1382,7 @@ function edOnCanvasClick(e) {
   if (e.target.closest('.obox') || e.target.closest('.ed-align-guide')) return;
   const wr = document.getElementById('edCanvasWrapper').getBoundingClientRect();
   const px = (e.clientX - wr.left) / edZoom, py = (e.clientY - wr.top) / edZoom;
-  const boxW = (90 / edImgNW) * 100, boxH = (34 / edImgNH) * 100;
+  const boxW = (135 / edImgNW) * 100, boxH = (34 / edImgNH) * 100;
   let bx = (px / edImgNW) * 100, by = (py / edImgNH) * 100;
 
   let rot = 0;
@@ -1256,8 +1393,8 @@ function edOnCanvasClick(e) {
       else bx = edAxisXPos - boxW;
     }
     if (edAxisYOn) {
-      if (edAxisYAnchor === 'top') by = edAxisYPos;
-      else by = edAxisYPos - boxH;
+      if (edAxisYAnchor === 'top') by = Math.max(0, edAxisYPos - boxH);  // 상단: 박스가 선 위에
+      else by = edAxisYPos;  // 하단: 박스가 선 아래에
     }
     if (edBoxModeRotSet) rot = edBoxModeRot;
   }
@@ -1269,7 +1406,8 @@ function edOnCanvasClick(e) {
   edBoxes[edSelectedUnit.호수] = { x: bx, y: by, w: boxW, h: boxH, rot: rot, name: edSelectedUnit.상호명, textAlign: tAlign, unit: edSelectedUnit };
 
   edRenderAllBoxes(); edRenderUnitList();
-  const all = edActiveDong === '전체' ? edUnits : edUnits.filter(u => u.동 === edActiveDong);
+  const base = edGetBaseUnits();
+  const all = edActiveDong === '전체' ? base : base.filter(u => u.동 === edActiveDong);
   const idx = all.findIndex(u => u.호수 === edSelectedUnit.호수);
   const next = all.slice(idx + 1).find(u => !edBoxes[u.호수]);
   if (next) edSelectUnit(next); else { edSelectedUnit = null; edRenderUnitList(); }
@@ -1286,7 +1424,8 @@ function edRenderAllBoxes() {
     el.style.left=b.x+'%'; el.style.top=b.y+'%'; el.style.width=b.w+'%'; el.style.height=b.h+'%';
     if (b.rot) el.style.transform = `rotate(${b.rot}deg)`;
     const ta = b.textAlign || 'left';
-    el.innerHTML = `<div class="obox-hosu">${hosu}</div><div class="obox-name" style="text-align:${ta}">${b.unit.상호명||hosu}</div><div class="obox-del">✕</div><div class="obox-rotate" title="회전">↻</div><div class="obox-resize"></div>`;
+    const rotDeg = b.rot || 0;
+    el.innerHTML = `<div class="obox-hosu">${hosu}</div><div class="obox-name" style="text-align:${ta}">${b.unit.상호명||hosu}</div><div class="obox-del">✕</div><div class="obox-rotate-label">${rotDeg}°</div><div class="obox-rotate" title="드래그하여 회전">↻</div><div class="obox-resize"></div>`;
     el.querySelector('.obox-del').addEventListener('click',ev=>{ev.stopPropagation();delete edBoxes[hosu];edRenderAllBoxes();edRenderUnitList();});
     el.querySelector('.obox-rotate').addEventListener('mousedown',edStartRotate);
     el.addEventListener('mousedown',edStartDrag);
@@ -1308,7 +1447,7 @@ function edStartDrag(e) {
       nx = edAxisXAnchor==='left' ? edAxisXPos : Math.max(0, edAxisXPos - b.w);
     }
     if(edBoxMode && edAxisYOn){
-      ny = edAxisYAnchor==='top' ? edAxisYPos : Math.max(0, edAxisYPos - b.h);
+      ny = edAxisYAnchor==='top' ? Math.max(0, edAxisYPos - b.h) : edAxisYPos;
     }
     edBoxes[sd.hosu].x=nx;edBoxes[sd.hosu].y=ny;
     sd.el.style.left=nx+'%';sd.el.style.top=ny+'%';
@@ -1338,6 +1477,8 @@ function edStartRotate(e) {
     newRot=Math.round(newRot/5)*5;
     edBoxes[hosu].rot=newRot;
     el.style.transform=`rotate(${newRot}deg)`;
+    // 각도 라벨 실시간 업데이트
+    const rl=el.querySelector('.obox-rotate-label');if(rl)rl.textContent=newRot+'°';
     // 상자 설정 모드: 이 각도를 기준 각도로 저장 (이후 새 박스에만 적용)
     if(edBoxMode){
       edBoxModeRot=newRot; edBoxModeRotSet=true;
@@ -1386,6 +1527,9 @@ function edSaveToMap(){
     floorplans[bName][gName] = {
       boxes: boxData,
       groupName: gName,
+      groupDongs: edGroupDongs.length > 0 ? [...edGroupDongs] : [],
+      groupHoFrom: edGroupHoFrom || '',
+      groupHoTo: edGroupHoTo || '',
       imgDataURL,
       savedAt: new Date().toISOString()
     };
