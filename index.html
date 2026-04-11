@@ -184,8 +184,11 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 /* 고화질 평면도 오버레이 */
 .card-fp-container{position:relative;width:100%;border-radius:6px;border:1px solid var(--line);overflow:visible;background:#f8f9fe;cursor:pointer}
 .card-fp-container img{width:100%;display:block;image-rendering:auto}
-.card-fp-box{position:absolute;background:rgba(37,99,235,.12);border:2px solid #2563eb;border-radius:3px;overflow:hidden;pointer-events:auto;display:flex;align-items:center;cursor:pointer}
+.card-fp-box{position:absolute;background:transparent;border:none;border-radius:0;overflow:hidden;pointer-events:auto;display:flex;align-items:center;cursor:pointer}
 .card-fp-box .fp-name{font-weight:700;color:#1a1c2a;text-align:left;line-height:1.2;white-space:nowrap;padding:2px 4px;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 6px #fff;pointer-events:none;width:100%;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis}
+.card-fp-box .fp-name.fp-color-vacant{color:#2563eb}
+.card-fp-box .fp-name.fp-color-suggest{color:#e84393}
+.card-fp-box .fp-name.fp-color-default{color:#1a1c2a}
 
 /* Editor Canvas */
 .ed-canvas-area{flex:1;overflow:auto;background:#e8eaf0;background-image:radial-gradient(circle,#c8cde0 1px,transparent 1px);background-size:20px 20px;position:relative}
@@ -570,47 +573,99 @@ function switchPage(page) {
 }
 
 // ═══════════════════════════════════════════════
-// LOAD DATA — 구글 시트 gviz
+// LOAD DATA — 구글 시트 CSV export (필터 무관 전체 데이터)
 // ═══════════════════════════════════════════════
+function parseCSV(text) {
+  const rows = []; let row = []; let cell = ''; let inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"' && text[i+1] === '"') { cell += '"'; i++; }
+      else if (c === '"') inQ = false;
+      else cell += c;
+    } else {
+      if (c === '"') inQ = true;
+      else if (c === ',') { row.push(cell); cell = ''; }
+      else if (c === '\n' || (c === '\r' && text[i+1] === '\n')) {
+        row.push(cell); cell = '';
+        if (row.some(v => v.trim())) rows.push(row);
+        row = [];
+        if (c === '\r') i++;
+      } else cell += c;
+    }
+  }
+  if (cell || row.length) { row.push(cell); if (row.some(v => v.trim())) rows.push(row); }
+  return rows;
+}
+
 function loadData() {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${SHEET_GID}`;
-  fetch(url)
-    .then(r => r.text())
+  const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${SHEET_GID}`;
+  const gvizUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${SHEET_GID}`;
+
+  // 1차: CSV export (필터 무시, 전체 데이터)
+  fetch(csvUrl)
+    .then(r => { if (!r.ok) throw new Error('CSV export 실패'); return r.text(); })
     .then(text => {
       try {
-        const json = JSON.parse(text.replace(/^[^(]+\(/, '').replace(/\);?\s*$/, ''));
-        if (json.status === 'error') throw new Error(json.errors?.[0]?.detailed_message || '시트 오류');
-        const table = json.table;
-        const cols = table.cols.map(c => (c.label || c.id || '').trim());
+        const parsed = parseCSV(text);
+        if (parsed.length < 2) throw new Error('데이터 부족');
+        const cols = parsed[0].map(c => c.trim());
         sheetHeaders = cols;
-        const rows = table.rows.map(row => {
+        const rows = parsed.slice(1).map(r => {
           const rec = {};
-          (row.c || []).forEach((cell, i) => {
-            if (i < cols.length && cols[i]) rec[cols[i]] = cell ? (cell.f ?? (cell.v != null ? String(cell.v) : '')) : '';
-          });
+          r.forEach((val, i) => { if (i < cols.length && cols[i]) rec[cols[i]] = (val || '').trim(); });
           return rec;
         });
         rawSheetRows = rows;
         buildings = groupRows(rows);
-        // 편집기 건물 목록도 채우기
         edPopulateBuildings(rows);
         document.getElementById('edSheetStatus').className = 'sheet-status connected';
-        document.getElementById('edSheetStatus').textContent = `✅ ${rows.length}개 행 로드됨`;
+        document.getElementById('edSheetStatus').textContent = `✅ ${rows.length}개 행 로드됨 (전체)`;
       } catch (e) {
-        showToast('데이터 로드 실패: ' + e.message);
-        buildings = {};
-        document.getElementById('edSheetStatus').className = 'sheet-status error';
-        document.getElementById('edSheetStatus').textContent = '❌ 로드 실패';
+        throw e; // fallback으로 전달
       }
       document.getElementById('loadingOverlay').style.display = 'none';
       initMap();
     })
     .catch(() => {
-      showToast('구글 시트 연결 실패');
-      document.getElementById('loadingOverlay').style.display = 'none';
-      document.getElementById('edSheetStatus').className = 'sheet-status error';
-      document.getElementById('edSheetStatus').textContent = '❌ 연결 실패';
-      initMap();
+      // 2차 fallback: gviz API
+      fetch(gvizUrl)
+        .then(r => r.text())
+        .then(text => {
+          try {
+            const json = JSON.parse(text.replace(/^[^(]+\(/, '').replace(/\);?\s*$/, ''));
+            if (json.status === 'error') throw new Error(json.errors?.[0]?.detailed_message || '시트 오류');
+            const table = json.table;
+            const cols = table.cols.map(c => (c.label || c.id || '').trim());
+            sheetHeaders = cols;
+            const rows = table.rows.map(row => {
+              const rec = {};
+              (row.c || []).forEach((cell, i) => {
+                if (i < cols.length && cols[i]) rec[cols[i]] = cell ? (cell.f ?? (cell.v != null ? String(cell.v) : '')) : '';
+              });
+              return rec;
+            });
+            rawSheetRows = rows;
+            buildings = groupRows(rows);
+            edPopulateBuildings(rows);
+            document.getElementById('edSheetStatus').className = 'sheet-status connected';
+            document.getElementById('edSheetStatus').textContent = `✅ ${rows.length}개 행 로드됨 (gviz)`;
+          } catch (e) {
+            showToast('데이터 로드 실패: ' + e.message);
+            buildings = {};
+            document.getElementById('edSheetStatus').className = 'sheet-status error';
+            document.getElementById('edSheetStatus').textContent = '❌ 로드 실패';
+          }
+          document.getElementById('loadingOverlay').style.display = 'none';
+          initMap();
+        })
+        .catch(() => {
+          showToast('구글 시트 연결 실패');
+          document.getElementById('loadingOverlay').style.display = 'none';
+          document.getElementById('edSheetStatus').className = 'sheet-status error';
+          document.getElementById('edSheetStatus').textContent = '❌ 연결 실패';
+          initMap();
+        });
     });
 }
 
@@ -785,22 +840,27 @@ function buildFloorplanView(bName, fp) {
     const cW = container.offsetWidth || 300;
     const natW = img.naturalWidth || cW;
     const scale = cW / natW;
+    // 건물명 컬럼 자동 탐색
+    const bCol = sheetHeaders.find(h => h === '건물명' || h === '상가명') || '';
     for (const [hosu, b] of Object.entries(fp.boxes)) {
       const box = document.createElement('div'); box.className='card-fp-box';
       box.style.left=b.x+'%'; box.style.top=b.y+'%'; box.style.width=b.w+'%'; box.style.height=b.h+'%';
       if(b.rot) box.style.transform=`rotate(${b.rot}deg)`;
-      // 편집기 obox-name = 11px @ 원본크기 → 카드에서는 11 * scale
       const fName = 11 * scale;
       const ta = b.textAlign || 'left';
-      box.innerHTML = `<span class="fp-name" style="font-size:${fName.toFixed(1)}px;text-align:${ta}">${b.name||hosu}</span>`;
+      // 프로세스별 색상 결정
+      const room = rawSheetRows.find(r => (r['호']||'').trim() === hosu && (r[bCol]||'').trim() === bName);
+      const proc = room ? (room['프로세스']||'').trim() : '';
+      let colorCls = 'fp-color-default';
+      if (proc === '공실') colorCls = 'fp-color-vacant';
+      else if (proc === '제안가능(등록)') colorCls = 'fp-color-suggest';
+      box.innerHTML = `<span class="fp-name ${colorCls}" style="font-size:${fName.toFixed(1)}px;text-align:${ta}">${b.name||hosu}</span>`;
       box.style.pointerEvents = 'auto';
       box.style.cursor = 'pointer';
       box.dataset.hosu = hosu;
       box.dataset.bname = bName;
       box.addEventListener('click', (ev) => {
         ev.stopPropagation();
-        // rawSheetRows에서 해당 호실 찾기
-        const room = rawSheetRows.find(r => (r['호']||'') === hosu && (r['상가명']||'').includes(bName));
         if (room) openDetail(room, bName);
         else showToast(`${hosu}호 정보 없음`);
       });
@@ -861,7 +921,18 @@ const wrapper=document.getElementById('canvasWrapper');
 wrapper.addEventListener('mousedown',e=>{if(isDraggingCard||e.target.closest('.building-card'))return;isPanning=true;panStart={x:e.clientX-panOffset.x,y:e.clientY-panOffset.y};wrapper.classList.add('panning');});
 document.addEventListener('mousemove',e=>{if(!isPanning)return;panOffset.x=e.clientX-panStart.x;panOffset.y=e.clientY-panStart.y;applyTransform();});
 document.addEventListener('mouseup',()=>{isPanning=false;wrapper.classList.remove('panning');});
-wrapper.addEventListener('wheel',e=>{e.preventDefault();const step=zoomScale*0.12;setZoom(zoomScale+(e.deltaY>0?-step:step));},{passive:false});
+wrapper.addEventListener('wheel',e=>{
+  if(e.ctrlKey||e.metaKey){
+    // Ctrl+휠: 확대/축소
+    e.preventDefault();const step=zoomScale*0.12;setZoom(zoomScale+(e.deltaY>0?-step:step));
+  } else {
+    // 일반 휠: 이동 (세로 스크롤 → 패닝)
+    e.preventDefault();
+    panOffset.x -= e.deltaX || 0;
+    panOffset.y -= e.deltaY || 0;
+    applyTransform();
+  }
+},{passive:false});
 document.getElementById('zoomIn').addEventListener('click',()=>setZoom(zoomScale*1.25));
 document.getElementById('zoomOut').addEventListener('click',()=>setZoom(zoomScale/1.25));
 document.getElementById('zoomFit').addEventListener('click',()=>{zoomScale=1;panOffset={x:80,y:80};applyTransform();});
