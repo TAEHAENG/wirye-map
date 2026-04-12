@@ -142,16 +142,16 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 /* ══ EDITOR PAGE ══ */
 .editor-layout{flex:1;display:flex;overflow:hidden}
 .editor-sidebar{width:320px;min-width:320px;background:var(--paper2);border-right:1.5px solid var(--line);display:flex;flex-direction:column;overflow:hidden}
-.editor-sidebar-top{padding:14px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
-.editor-sidebar-title{font-size:12px;font-weight:700;color:var(--text2);letter-spacing:.5px;text-transform:uppercase}
+.editor-sidebar-top{padding:6px 12px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:4px}
+.editor-sidebar-title{font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.5px;text-transform:uppercase}
 
 /* Sheet connection */
-.sheet-status{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:8px;background:var(--paper);border:1.5px solid var(--line);font-size:12px}
+.sheet-status{display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:6px;background:var(--paper);border:1.5px solid var(--line);font-size:11px}
 .sheet-status.connected{background:var(--green-light);border-color:#86efac;color:var(--green)}
 .sheet-status.error{background:var(--red-light);border-color:#fca5a5;color:var(--red)}
 
 .building-selector{display:flex;gap:6px;align-items:center}
-.building-selector select{flex:1;height:34px;border:1.5px solid var(--line);border-radius:7px;padding:0 10px;font-size:13px;font-family:inherit;background:var(--paper2);color:var(--text);outline:none}
+.building-selector select{flex:1;height:30px;border:1.5px solid var(--line);border-radius:7px;padding:0 8px;font-size:12px;font-family:inherit;background:var(--paper2);color:var(--text);outline:none}
 .building-selector select:focus{border-color:var(--blue)}
 
 /* Editor dong & unit list */
@@ -173,7 +173,11 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 .ed-unit-name{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
 .ed-unit-meta{font-size:10px;color:var(--text3)}
 
-.ed-sidebar-foot{padding:10px 12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+.ed-sidebar-foot{padding:6px 10px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:4px}
+
+/* Map bg tiles */
+.map-tile{position:absolute;z-index:0;pointer-events:none;image-rendering:auto}
+.canvas.map-bg-on{background:none!important}
 .ed-hint{font-size:11px;color:var(--text2);line-height:1.5;padding:8px 10px;background:var(--blue-light);border-radius:6px;border-left:3px solid var(--blue)}
 .placed-pill{font-family:'IBM Plex Mono',monospace;font-size:11px;background:var(--blue-light);color:var(--blue);padding:2px 8px;border-radius:8px;font-weight:700}
 
@@ -311,6 +315,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
   </div>
 
   <div class="topbar-actions" id="mapActions">
+    <button class="filter-toggle" id="mapBgBtn" title="배경에 OSM 지도를 표시/숨김합니다" onclick="toggleMapBg()">🗺️ 지도</button>
     <button class="filter-toggle" id="vacantFilter" title="공실만 보기">공실만</button>
     <button class="btn" id="resetLayout" title="배치 초기화">↻ 초기화</button>
     <button class="btn primary" id="saveLayout">💾 저장</button>
@@ -356,28 +361,24 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
     <!-- Sidebar -->
     <div class="editor-sidebar">
       <div class="editor-sidebar-top">
-        <div class="editor-sidebar-title">건물 선택</div>
-        <div class="sheet-status" id="edSheetStatus">시트 연결 중...</div>
+        <div class="sheet-status" id="edSheetStatus" style="font-size:10px;padding:3px 8px">시트 연결 중...</div>
         <div class="building-selector">
-          <select id="edBuildingSelect"><option value="">-- 건물을 선택하세요 --</option></select>
-          <button class="btn primary" onclick="edLoadBuilding()">불러오기</button>
-        </div>
-        <div class="editor-sidebar-title" style="margin-top:6px">평면도 이미지</div>
-        <div style="display:flex;gap:6px">
-          <label class="btn" style="cursor:pointer;flex:1;justify-content:center">
-            📁 이미지 선택
+          <select id="edBuildingSelect" style="height:28px;font-size:11px"><option value="">-- 건물 선택 --</option></select>
+          <button class="btn primary" onclick="edLoadBuilding()" style="height:28px;font-size:11px;padding:0 10px">불러오기</button>
+          <label class="btn" style="cursor:pointer;height:28px;font-size:11px;padding:0 8px" title="평면도 이미지 업로드">
+            📁 이미지
             <input type="file" id="edImgInput" accept="image/*" style="display:none" onchange="edHandleImage(this)">
           </label>
-          <span id="edImgName" style="font-size:11px;color:var(--text3);align-self:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100px"></span>
         </div>
+        <span id="edImgName" style="font-size:10px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
       </div>
 
-      <div class="editor-sidebar-top" style="border-bottom:none;padding-top:6px">
+      <div class="editor-sidebar-top" style="border-bottom:none;padding-top:4px;padding-bottom:2px">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div class="editor-sidebar-title">호실 목록</div>
           <span class="placed-pill" id="edPlacedPill">0 / 0</span>
         </div>
-        <input class="topbar-search" style="max-width:none;height:30px" placeholder="호수 또는 상호명 검색…" id="edUnitSearch" oninput="edRenderUnitList()">
+        <input class="topbar-search" style="max-width:none;height:26px;font-size:11px" placeholder="호수 또는 상호명 검색…" id="edUnitSearch" oninput="edRenderUnitList()">
       </div>
       <div class="ed-dong-tabs" id="edDongTabs"></div>
       <div class="ed-unit-list" id="edUnitList"></div>
@@ -432,18 +433,18 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
       </div>
 
       <div class="ed-sidebar-foot">
-        <div class="ed-hint">목록에서 호수 선택 후 평면도를 클릭해 위치 지정</div>
-        <div style="display:flex;gap:6px">
-          <button class="btn" style="flex:1;font-size:11px" onclick="edClearBuildingBoxes()">🏢 이 건물 초기화</button>
-          <button class="btn" style="flex:1;font-size:11px" onclick="edClearAllBoxes()">전체 초기화</button>
+        <div class="ed-hint" style="padding:5px 8px;font-size:10px">목록에서 호수 선택 후 평면도를 클릭해 위치 지정</div>
+        <div style="display:flex;gap:4px">
+          <button class="btn" style="flex:1;font-size:10px" onclick="edClearGroupBoxes()" title="현재 선택된 그룹(층)의 배치와 평면도만 초기화합니다">🏢 이 그룹 초기화</button>
+          <button class="btn" style="flex:1;font-size:10px" onclick="edClearAllBoxes()" title="현재 편집 중인 모든 박스 배치를 초기화합니다">전체 초기화</button>
         </div>
-        <div style="display:flex;gap:6px">
-          <button class="btn primary" style="flex:1;font-size:11px" onclick="edSaveToMap()">🗺️ 지도에 저장</button>
-          <button class="btn" style="flex:1;font-size:11px" onclick="edExportImg()">📷 이미지</button>
+        <div style="display:flex;gap:4px">
+          <button class="btn primary" style="flex:1;font-size:10px" onclick="edSaveToMap()" title="현재 그룹의 평면도와 호실 배치를 전체지도에 반영합니다">🗺️ 지도에 저장</button>
+          <button class="btn" style="flex:1;font-size:10px" onclick="edExportImg()" title="현재 평면도를 호실명이 표시된 PNG 이미지로 다운로드합니다">📷 이미지</button>
         </div>
-        <div style="display:flex;gap:6px">
-          <button class="btn" style="flex:1;font-size:11px" onclick="edSaveLayout()">💾 JSON 저장</button>
-          <label class="btn" style="flex:1;font-size:11px;cursor:pointer;justify-content:center">
+        <div style="display:flex;gap:4px">
+          <button class="btn" style="flex:1;font-size:10px" onclick="edSaveLayout()" title="호실 배치 좌표를 JSON 파일로 다운로드합니다 (백업용)">💾 JSON 저장</button>
+          <label class="btn" style="flex:1;font-size:10px;cursor:pointer;justify-content:center" title="이전에 저장한 JSON 레이아웃 파일을 불러와 배치를 복원합니다">
             📂 불러오기
             <input type="file" accept=".json" style="display:none" onchange="edLoadLayout(this)">
           </label>
@@ -733,7 +734,10 @@ function getDefaultPosition(idx) { const c = idx % 3; const r = Math.floor(idx /
 
 function renderAllCards() {
   const canvas = document.getElementById('canvas');
+  // 지도 타일 컨테이너 보존
+  const mapContainer = document.getElementById('mapTileContainer');
   canvas.innerHTML = '';
+  if (mapContainer) canvas.appendChild(mapContainer);
   Object.keys(buildings).sort().forEach((bName, idx) => {
     const cardId = 'card_' + btoa(encodeURIComponent(bName)).replace(/[^a-zA-Z0-9]/g, '_');
     if (!cardStates[cardId]) {
@@ -1495,6 +1499,12 @@ function edRenderUnitList() {
 
 function edSelectUnit(u) {
   edSelectedUnit = u; edRenderUnitList();
+  // 선택된 호실이 목록에서 보이도록 자동 스크롤
+  requestAnimationFrame(() => {
+    const list = document.getElementById('edUnitList');
+    const activeRow = list.querySelector('.ed-unit-row.active');
+    if (activeRow) activeRow.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
   const h = document.getElementById('edPlacingHint');
   h.textContent = `📍 "${u.호수} ${u.상호명}" — 평면도에서 위치 클릭`;
   h.classList.add('visible');
@@ -1644,18 +1654,29 @@ function edChangeZoom(d){edZoom=Math.max(.2,Math.min(5,edZoom+d));edApplyZoom();
 function edApplyZoom(){const img=document.getElementById('ed-floorplan-img');img.style.width=(edImgNW*edZoom)+'px';img.style.height=(edImgNH*edZoom)+'px';document.getElementById('edZoomVal').textContent=Math.round(edZoom*100)+'%';}
 function edClearAllBoxes(){if(!confirm('모든 박스를 초기화할까요?'))return;edBoxes={};edRenderAllBoxes();edRenderUnitList();}
 
-// 이 건물 초기화 (현재 선택된 건물이름 기준)
-function edClearBuildingBoxes(){
+// 이 그룹(층) 초기화 — 현재 선택된 그룹의 배치+이미지만 삭제
+function edClearGroupBoxes(){
   const bName = document.getElementById('edBuildingSelect').value;
   if(!bName){showToast('건물을 먼저 선택하세요');return;}
-  if(!confirm(`"${bName}" 의 배치를 초기화할까요?`))return;
+  if(!edGroupNameVal){showToast('그룹(층)을 먼저 선택하세요');return;}
+  if(!confirm(`"${bName} / ${edGroupNameVal}" 그룹을 초기화할까요?`))return;
   edBoxes={};
-  // localStorage 평면도도 삭제
-  delete floorplans[bName];
+  // 해당 그룹의 저장된 평면도만 삭제
+  if(floorplans[bName]){
+    delete floorplans[bName][edGroupNameVal];
+    if(Object.keys(floorplans[bName]).length===0) delete floorplans[bName];
+  }
   localStorage.setItem(FLOORPLAN_KEY, JSON.stringify(floorplans));
+  // 편집기 이미지 초기화
+  edImageURL='';
+  document.getElementById('ed-floorplan-img').src='';
+  document.getElementById('edDropzone').classList.remove('has-file');
+  document.getElementById('edCanvasScroller').style.display='none';
+  document.getElementById('edZoomBar').style.display='none';
   edRenderAllBoxes();edRenderUnitList();
+  edRenderGroupTabs(bName);
   refreshAllCards();
-  showToast(`✅ ${bName} 초기화 완료`);
+  showToast(`✅ ${bName}/${edGroupNameVal} 초기화 완료`);
 }
 
 // 지도에 저장 — 그룹명별 저장
@@ -1782,6 +1803,81 @@ function edLoadLayout(input) {
     edRenderAllBoxes();edRenderUnitList();showToast(`✅ 레이아웃 복원 완료 (${Object.keys(edBoxes).length}개)`);
   }catch(err){showToast('❌ '+err.message);}input.value='';};
   reader.readAsText(file);
+}
+
+// ═══════════════════════════════════════════════
+// MAP BACKGROUND — OSM TILES
+// ═══════════════════════════════════════════════
+let mapBgOn = false;
+
+function toggleMapBg() {
+  mapBgOn = !mapBgOn;
+  const btn = document.getElementById('mapBgBtn');
+  btn.classList.toggle('on', mapBgOn);
+  btn.textContent = mapBgOn ? '지도 숨김' : '🗺️ 지도';
+  const canvas = document.getElementById('canvas');
+  if (mapBgOn) {
+    loadMapTiles();
+    canvas.classList.add('map-bg-on');
+  } else {
+    const c = document.getElementById('mapTileContainer');
+    if (c) c.style.display = 'none';
+    canvas.classList.remove('map-bg-on');
+  }
+}
+
+function loadMapTiles() {
+  const canvas = document.getElementById('canvas');
+  let container = document.getElementById('mapTileContainer');
+  if (container) { container.style.display = ''; return; } // 이미 로드됨
+
+  container = document.createElement('div');
+  container.id = 'mapTileContainer';
+  container.style.cssText = 'position:absolute;inset:0;z-index:0;pointer-events:none;opacity:0.55;';
+  canvas.insertBefore(container, canvas.firstChild);
+
+  // 위례 신도시 중심 좌표
+  const lat = 37.4767026, lng = 127.1420792;
+  const z = 17, tileSize = 256;
+  const n = Math.pow(2, z);
+
+  // 위경도 → 타일 좌표
+  const centerTX = (lng + 180) / 360 * n;
+  const latRad = lat * Math.PI / 180;
+  const centerTY = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
+
+  const canvasW = 3000, canvasH = 3000;
+  const tilesX = Math.ceil(canvasW / tileSize) + 1; // ~13
+  const tilesY = Math.ceil(canvasH / tileSize) + 1;
+
+  const startTX = Math.floor(centerTX - tilesX / 2);
+  const startTY = Math.floor(centerTY - tilesY / 2);
+
+  const offsetX = canvasW / 2 - (centerTX - startTX) * tileSize;
+  const offsetY = canvasH / 2 - (centerTY - startTY) * tileSize;
+
+  const subdomains = ['a', 'b', 'c'];
+  for (let dy = 0; dy < tilesY; dy++) {
+    for (let dx = 0; dx < tilesX; dx++) {
+      const tx = startTX + dx, ty = startTY + dy;
+      const s = subdomains[(dx + dy) % 3];
+      const img = document.createElement('img');
+      img.className = 'map-tile';
+      img.src = `https://${s}.tile.openstreetmap.org/${z}/${tx}/${ty}.png`;
+      img.style.left = Math.round(offsetX + dx * tileSize) + 'px';
+      img.style.top = Math.round(offsetY + dy * tileSize) + 'px';
+      img.style.width = tileSize + 'px';
+      img.style.height = tileSize + 'px';
+      img.draggable = false;
+      img.loading = 'lazy';
+      container.appendChild(img);
+    }
+  }
+  // OSM 저작자 표시
+  const attr = document.createElement('div');
+  attr.style.cssText = 'position:absolute;bottom:4px;right:4px;font-size:9px;color:#666;background:rgba(255,255,255,.7);padding:1px 4px;border-radius:3px;pointer-events:auto;';
+  attr.innerHTML = '© <a href="https://www.openstreetmap.org/copyright" target="_blank" style="color:#0078A8">OpenStreetMap</a>';
+  container.appendChild(attr);
 }
 
 // ═══════════════════════════════════════════════
