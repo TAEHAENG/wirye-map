@@ -1501,6 +1501,17 @@ function edSelectUnit(u) {
   setTimeout(()=>h.classList.remove('visible'), 3500);
 }
 
+// ── 회전 보정: 시각적 바운딩 박스 반크기 계산 ──
+// CSS rotate는 중심 기준 회전 → 시각적 위치와 CSS left/top이 달라짐
+function getVisualHalf(boxW, boxH, rotDeg) {
+  if (!rotDeg) return { hw: boxW / 2, hh: boxH / 2 };
+  const rad = Math.abs(rotDeg % 360) * Math.PI / 180;
+  return {
+    hw: (boxW * Math.abs(Math.cos(rad)) + boxH * Math.abs(Math.sin(rad))) / 2,
+    hh: (boxW * Math.abs(Math.sin(rad)) + boxH * Math.abs(Math.cos(rad))) / 2
+  };
+}
+
 // ── 캔버스 클릭 → 박스 배치 ──
 function edOnCanvasClick(e) {
   if (!edSelectedUnit) return;
@@ -1508,20 +1519,30 @@ function edOnCanvasClick(e) {
   const wr = document.getElementById('edCanvasWrapper').getBoundingClientRect();
   const px = (e.clientX - wr.left) / edZoom, py = (e.clientY - wr.top) / edZoom;
   const boxW = (135 / edImgNW) * 100, boxH = (34 / edImgNH) * 100;
-  let bx = (px / edImgNW) * 100, by = (py / edImgNH) * 100;
 
   let rot = 0;
-  // 상자 설정 모드 적용
+  if (edBoxMode && edBoxModeRotSet) rot = edBoxModeRot;
+
+  // 회전 보정값 계산
+  const vis = getVisualHalf(boxW, boxH, rot);
+  // 클릭 위치 → 시각적 좌상단이 커서에 오도록 보정
+  let bx = (px / edImgNW) * 100 + vis.hw - boxW / 2;
+  let by = (py / edImgNH) * 100 + vis.hh - boxH / 2;
+
+  // 상자 설정 모드: 축 정렬 (회전 보정 적용)
   if (edBoxMode) {
     if (edAxisXOn) {
-      if (edAxisXAnchor === 'left') bx = edAxisXPos;
-      else bx = edAxisXPos - boxW;
+      // 좌측: 시각적 왼쪽 모서리를 축에 맞춤 / 우측: 시각적 오른쪽 모서리를 축에 맞춤
+      bx = edAxisXAnchor === 'left'
+        ? edAxisXPos + vis.hw - boxW / 2
+        : edAxisXPos - vis.hw - boxW / 2;
     }
     if (edAxisYOn) {
-      if (edAxisYAnchor === 'top') by = Math.max(0, edAxisYPos - boxH);  // 상단: 박스가 선 위에
-      else by = edAxisYPos;  // 하단: 박스가 선 아래에
+      // 상단: 시각적 하단을 축에 맞춤(박스가 선 위) / 하단: 시각적 상단을 축에 맞춤(박스가 선 아래)
+      by = edAxisYAnchor === 'top'
+        ? edAxisYPos - vis.hh - boxH / 2
+        : edAxisYPos + vis.hh - boxH / 2;
     }
-    if (edBoxModeRotSet) rot = edBoxModeRot;
   }
 
   bx = Math.max(0, Math.min(98 - boxW, bx));
@@ -1571,10 +1592,12 @@ function edStartDrag(e) {
     const dx=(ev.clientX-sd.sx)/(edImgNW*edZoom)*100,dy=(ev.clientY-sd.sy)/(edImgNH*edZoom)*100;
     let nx=Math.max(0,Math.min(95,sd.ox+dx)), ny=Math.max(0,Math.min(95,sd.oy+dy));
     if(edBoxMode && edAxisXOn){
-      nx = edAxisXAnchor==='left' ? edAxisXPos : Math.max(0, edAxisXPos - b.w);
+      const vis = getVisualHalf(b.w, b.h, b.rot);
+      nx = edAxisXAnchor==='left' ? edAxisXPos + vis.hw - b.w/2 : edAxisXPos - vis.hw - b.w/2;
     }
     if(edBoxMode && edAxisYOn){
-      ny = edAxisYAnchor==='top' ? Math.max(0, edAxisYPos - b.h) : edAxisYPos;
+      const vis = getVisualHalf(b.w, b.h, b.rot);
+      ny = edAxisYAnchor==='top' ? edAxisYPos - vis.hh - b.h/2 : edAxisYPos + vis.hh - b.h/2;
     }
     edBoxes[sd.bkey].x=nx;edBoxes[sd.bkey].y=ny;
     sd.el.style.left=nx+'%';sd.el.style.top=ny+'%';
