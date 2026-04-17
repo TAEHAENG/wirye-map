@@ -224,6 +224,22 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
   body > .detail-panel.fp-fullscreen-mode{width:100%;top:auto;bottom:0;height:50vh;border-left:none;border-top:1.5px solid var(--line)}
 }
 
+/* 레이어 합성 모드 */
+.compose-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:8000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;touch-action:none}
+.compose-stage{position:relative;background:#f3f4f6;border:2px solid #fff;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.4);background-image:linear-gradient(45deg,#e5e7eb 25%,transparent 25%),linear-gradient(-45deg,#e5e7eb 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e5e7eb 75%),linear-gradient(-45deg,transparent 75%,#e5e7eb 75%);background-size:20px 20px;background-position:0 0,0 10px,10px -10px,10px 0}
+.compose-layer{position:absolute;cursor:move;user-select:none;box-sizing:border-box}
+.compose-layer img{display:block;width:100%;height:100%;pointer-events:none;-webkit-user-drag:none}
+.compose-layer.selected{outline:2px dashed #3b82f6;outline-offset:-2px}
+.compose-layer-handle{position:absolute;width:18px;height:18px;background:#3b82f6;border:2px solid #fff;border-radius:3px;cursor:nwse-resize;bottom:-9px;right:-9px;box-shadow:0 2px 4px rgba(0,0,0,.3);display:none}
+.compose-layer.selected .compose-layer-handle{display:block}
+.compose-toolbar{margin-top:14px;display:flex;gap:8px;background:rgba(0,0,0,.75);padding:10px 14px;border-radius:10px;color:#fff;align-items:center;flex-wrap:wrap;justify-content:center;max-width:90vw}
+.compose-toolbar .hint{font-size:11px;opacity:.8;margin-right:6px}
+.compose-toolbar button{padding:7px 14px;font-size:12px;border:none;border-radius:6px;cursor:pointer;font-weight:600}
+.compose-toolbar button.ok{background:#10b981;color:#fff}
+.compose-toolbar button.cancel{background:#6b7280;color:#fff}
+.compose-toolbar button.del{background:#ef4444;color:#fff}
+.compose-toolbar button.add{background:#3b82f6;color:#fff}
+
 /* 카드 리사이즈 핸들 */
 .card-resize-handle{position:absolute;bottom:0;right:0;width:18px;height:18px;cursor:se-resize;z-index:20;opacity:0;transition:opacity .15s}
 .card-resize-handle::after{content:'';position:absolute;bottom:3px;right:3px;width:10px;height:10px;border-right:2.5px solid var(--blue);border-bottom:2.5px solid var(--blue);border-radius:0 0 3px 0;opacity:.7}
@@ -451,6 +467,10 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
           <label class="btn" style="cursor:pointer;height:28px;font-size:11px;padding:0 8px" title="평면도 이미지 업로드">
             📁 이미지
             <input type="file" id="edImgInput" accept="image/*" style="display:none" onchange="edHandleImage(this)">
+          </label>
+          <label class="btn" style="cursor:pointer;height:28px;font-size:11px;padding:0 8px" title="여러 이미지를 올려 하나의 평면도로 합치기 (A동+B동 등)">
+            🧩 합성
+            <input type="file" id="edComposeInput" accept="image/*" multiple style="display:none" onchange="edStartCompose(this)">
           </label>
           <button class="btn" onclick="edStartCrop()" style="height:28px;font-size:11px;padding:0 8px" title="평면도 외곽을 선택해서 잘라내고 흰 여백을 추가합니다">✂️ 크롭</button>
         </div>
@@ -1841,7 +1861,277 @@ function edHandleImage(input) {
     edApplyZoom(); edRenderAllBoxes();
     edUpdateAlignGuide();
   };
-  document.getElementById('edCanvasWrapper').addEventListener('click', edOnCanvasClick);
+  const _wrap = document.getElementById('edCanvasWrapper');
+  if (!_wrap._clickBound) { _wrap.addEventListener('click', edOnCanvasClick); _wrap._clickBound = true; }
+}
+
+// ── 레이어 합성 (여러 이미지를 한 장으로) ──
+let composeState = null;
+
+function edStartCompose(input) {
+  const files = Array.from(input.files || []);
+  input.value = '';
+  if (!files.length) return;
+  Promise.all(files.map(f => new Promise((res, rej) => {
+    const url = URL.createObjectURL(f);
+    const img = new Image();
+    img.onload = () => res({ url, img, name: f.name });
+    img.onerror = () => rej(new Error('이미지 로드 실패: ' + f.name));
+    img.src = url;
+  }))).then(loaded => {
+    edOpenComposeUI(loaded);
+  }).catch(err => {
+    showToast(err.message || '이미지 로드 실패');
+  });
+}
+
+function edAddComposeFiles(input) {
+  const files = Array.from(input.files || []);
+  input.value = '';
+  if (!files.length || !composeState) return;
+  Promise.all(files.map(f => new Promise((res, rej) => {
+    const url = URL.createObjectURL(f);
+    const img = new Image();
+    img.onload = () => res({ url, img, name: f.name });
+    img.onerror = () => rej(new Error('이미지 로드 실패: ' + f.name));
+    img.src = url;
+  }))).then(loaded => {
+    loaded.forEach((l, i) => composeAddLayer(l, composeState.layers.length + i));
+  }).catch(err => {
+    showToast(err.message || '이미지 로드 실패');
+  });
+}
+
+function edOpenComposeUI(loaded) {
+  // 스테이지 크기: 가장 큰 이미지의 1.8배 정도 여유 공간
+  const maxW = Math.max(...loaded.map(l => l.img.naturalWidth));
+  const maxH = Math.max(...loaded.map(l => l.img.naturalHeight));
+  const naturalW = Math.round(maxW * 1.8);
+  const naturalH = Math.round(maxH * 1.8);
+  const vw = window.innerWidth * 0.82;
+  const vh = window.innerHeight * 0.72;
+  const scale = Math.min(vw / naturalW, vh / naturalH, 1);
+
+  const overlay = document.createElement('div'); overlay.className = 'compose-overlay';
+  const stage = document.createElement('div'); stage.className = 'compose-stage';
+  stage.style.width = (naturalW * scale) + 'px';
+  stage.style.height = (naturalH * scale) + 'px';
+
+  composeState = { layers: [], stage, overlay, scale, naturalW, naturalH, selected: null };
+
+  // 빈 곳 클릭 → 선택 해제
+  stage.addEventListener('mousedown', (e) => {
+    if (e.target === stage) composeSelect(null);
+  });
+
+  loaded.forEach((l, i) => composeAddLayer(l, i));
+
+  const toolbar = document.createElement('div'); toolbar.className = 'compose-toolbar';
+  toolbar.innerHTML = `
+    <span class="hint">드래그로 이동 · 모서리로 크기 · 클릭으로 선택</span>
+    <label class="add" style="padding:7px 14px;font-size:12px;border-radius:6px;cursor:pointer;font-weight:600">
+      + 이미지 추가
+      <input type="file" accept="image/*" multiple style="display:none" onchange="edAddComposeFiles(this)">
+    </label>
+    <button class="del" onclick="edComposeDeleteSelected()">선택 삭제</button>
+    <button class="ok" onclick="edComposeApply()">✓ 합치기</button>
+    <button class="cancel" onclick="edComposeCancel()">취소</button>
+  `;
+
+  overlay.appendChild(stage);
+  overlay.appendChild(toolbar);
+  document.body.appendChild(overlay);
+
+  document.addEventListener('keydown', composeKeyHandler);
+}
+
+function composeKeyHandler(ev) {
+  if (!composeState) { document.removeEventListener('keydown', composeKeyHandler); return; }
+  if (ev.key === 'Escape') edComposeCancel();
+  else if (ev.key === 'Delete' || ev.key === 'Backspace') {
+    if (composeState.selected) { ev.preventDefault(); edComposeDeleteSelected(); }
+  }
+}
+
+function composeAddLayer(l, idx) {
+  const { stage, scale } = composeState;
+  // 초기 크기: 자연 크기의 scale, 너무 크면 스테이지의 60%로 축소
+  const stageW = parseFloat(stage.style.width);
+  const stageH = parseFloat(stage.style.height);
+  let dispW = l.img.naturalWidth * scale;
+  let dispH = l.img.naturalHeight * scale;
+  const maxDisp = Math.min(stageW, stageH) * 0.6;
+  if (Math.max(dispW, dispH) > maxDisp) {
+    const k = maxDisp / Math.max(dispW, dispH);
+    dispW *= k; dispH *= k;
+  }
+  const x = 30 + (idx % 3) * 50;
+  const y = 30 + (idx % 3) * 50;
+
+  const layerEl = document.createElement('div'); layerEl.className = 'compose-layer';
+  layerEl.style.left = x + 'px'; layerEl.style.top = y + 'px';
+  layerEl.style.width = dispW + 'px'; layerEl.style.height = dispH + 'px';
+  const imgEl = document.createElement('img'); imgEl.src = l.url; imgEl.draggable = false;
+  layerEl.appendChild(imgEl);
+  const handle = document.createElement('div'); handle.className = 'compose-layer-handle';
+  layerEl.appendChild(handle);
+
+  const state = { el: layerEl, img: l.img, url: l.url, x, y, w: dispW, h: dispH };
+  composeState.layers.push(state);
+
+  layerEl.addEventListener('mousedown', (e) => {
+    if (e.target === handle) { startComposeResize(state, e); return; }
+    e.preventDefault(); e.stopPropagation();
+    composeSelect(state);
+    // bring to front
+    stage.appendChild(layerEl);
+    const sx = e.clientX, sy = e.clientY, ox = state.x, oy = state.y;
+    function mv(ev) {
+      state.x = ox + (ev.clientX - sx);
+      state.y = oy + (ev.clientY - sy);
+      layerEl.style.left = state.x + 'px'; layerEl.style.top = state.y + 'px';
+    }
+    function up() {
+      window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up);
+    }
+    window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
+  });
+
+  // 터치
+  layerEl.addEventListener('touchstart', (e) => {
+    if (e.target === handle) { startComposeResize(state, e.touches[0], true); return; }
+    e.preventDefault();
+    composeSelect(state);
+    stage.appendChild(layerEl);
+    const t = e.touches[0];
+    const sx = t.clientX, sy = t.clientY, ox = state.x, oy = state.y;
+    function mv(ev) {
+      const tt = ev.touches[0];
+      state.x = ox + (tt.clientX - sx);
+      state.y = oy + (tt.clientY - sy);
+      layerEl.style.left = state.x + 'px'; layerEl.style.top = state.y + 'px';
+    }
+    function up() {
+      window.removeEventListener('touchmove', mv); window.removeEventListener('touchend', up);
+    }
+    window.addEventListener('touchmove', mv, { passive: false });
+    window.addEventListener('touchend', up);
+  }, { passive: false });
+
+  stage.appendChild(layerEl);
+  composeSelect(state);
+}
+
+function startComposeResize(state, startEvent, isTouch) {
+  const sx = startEvent.clientX, sy = startEvent.clientY;
+  const ow = state.w, oh = state.h;
+  const ratio = ow / oh;
+  if (startEvent.preventDefault) startEvent.preventDefault();
+  function mv(ev) {
+    const p = isTouch ? ev.touches[0] : ev;
+    const dx = p.clientX - sx;
+    let nw = Math.max(40, ow + dx);
+    let nh = nw / ratio;
+    state.w = nw; state.h = nh;
+    state.el.style.width = nw + 'px'; state.el.style.height = nh + 'px';
+  }
+  function up() {
+    if (isTouch) {
+      window.removeEventListener('touchmove', mv); window.removeEventListener('touchend', up);
+    } else {
+      window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up);
+    }
+  }
+  if (isTouch) {
+    window.addEventListener('touchmove', mv, { passive: false });
+    window.addEventListener('touchend', up);
+  } else {
+    window.addEventListener('mousemove', mv);
+    window.addEventListener('mouseup', up);
+  }
+}
+
+function composeSelect(state) {
+  if (!composeState) return;
+  composeState.layers.forEach(l => l.el.classList.remove('selected'));
+  if (state) state.el.classList.add('selected');
+  composeState.selected = state;
+}
+
+function edComposeDeleteSelected() {
+  if (!composeState || !composeState.selected) { showToast('선택된 이미지가 없어요'); return; }
+  const s = composeState.selected;
+  s.el.remove();
+  URL.revokeObjectURL(s.url);
+  composeState.layers = composeState.layers.filter(l => l !== s);
+  composeState.selected = null;
+}
+
+function edComposeCancel() {
+  if (!composeState) return;
+  composeState.layers.forEach(l => URL.revokeObjectURL(l.url));
+  composeState.overlay.remove();
+  document.removeEventListener('keydown', composeKeyHandler);
+  composeState = null;
+}
+
+function edComposeApply() {
+  if (!composeState || !composeState.layers.length) { showToast('이미지가 없어요'); return; }
+  const { layers, scale } = composeState;
+  // 표시 좌표의 바운딩 박스
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  layers.forEach(l => {
+    minX = Math.min(minX, l.x); minY = Math.min(minY, l.y);
+    maxX = Math.max(maxX, l.x + l.w); maxY = Math.max(maxY, l.y + l.h);
+  });
+  // 표시→자연 크기 환산 (scale로 나누기)
+  const outW = Math.max(1, Math.round((maxX - minX) / scale));
+  const outH = Math.max(1, Math.round((maxY - minY) / scale));
+  // 너무 거대한 캔버스 방지
+  const MAX_DIM = 6000;
+  let renderScale = 1;
+  if (outW > MAX_DIM || outH > MAX_DIM) renderScale = MAX_DIM / Math.max(outW, outH);
+  const cw = Math.round(outW * renderScale);
+  const ch = Math.round(outH * renderScale);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = cw; canvas.height = ch;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, cw, ch);
+
+  // DOM 순서 기준으로 그리기 (stage의 실제 자식 순서 = z-order)
+  const domOrder = Array.from(composeState.stage.querySelectorAll('.compose-layer'));
+  domOrder.forEach(el => {
+    const l = layers.find(x => x.el === el);
+    if (!l) return;
+    const dx = (l.x - minX) / scale * renderScale;
+    const dy = (l.y - minY) / scale * renderScale;
+    const dw = l.w / scale * renderScale;
+    const dh = l.h / scale * renderScale;
+    ctx.drawImage(l.img, dx, dy, dw, dh);
+  });
+
+  const dataURL = canvas.toDataURL('image/png');
+
+  edImageURL = dataURL;
+  document.getElementById('edImgName').textContent = `합성_${layers.length}장.png`;
+  const dz = document.getElementById('edDropzone'); if (dz) dz.classList.add('has-file');
+  document.getElementById('edCanvasScroller').style.display = '';
+  document.getElementById('edZoomBar').style.display = '';
+  const img = document.getElementById('ed-floorplan-img');
+  img.src = dataURL;
+  img.onload = () => {
+    edImgNW = img.naturalWidth; edImgNH = img.naturalHeight;
+    edApplyZoom(); edRenderAllBoxes();
+    edUpdateAlignGuide();
+  };
+  const wrap = document.getElementById('edCanvasWrapper');
+  if (!wrap._clickBound) { wrap.addEventListener('click', edOnCanvasClick); wrap._clickBound = true; }
+
+  edComposeCancel();
+  showToast('합성 완료! 필요하면 ✂️ 크롭으로 여백을 정리하세요');
 }
 
 // ── 크롭 기능 ──
