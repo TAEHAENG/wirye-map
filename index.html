@@ -196,16 +196,33 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 .card-floorplan-info{font-size:9px;color:var(--text3);padding:3px 8px 6px;text-align:right}
 
 /* 평면도 풀스크린 오버레이 */
-.fp-fullscreen-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);z-index:9000;display:flex;align-items:center;justify-content:center;cursor:zoom-out;transition:right .25s cubic-bezier(.4,0,.2,1)}
+.fp-fullscreen-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);z-index:9000;display:flex;align-items:center;justify-content:center;cursor:zoom-out;transition:right .25s cubic-bezier(.4,0,.2,1);overflow:hidden;touch-action:none}
 .fp-fullscreen-overlay.with-panel{right:300px}
-.fp-fullscreen-inner{position:relative;max-width:95vw;max-height:92vh;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 20px 80px rgba(0,0,0,.5)}
-.fp-fullscreen-inner img{display:block;max-width:95vw;max-height:88vh;object-fit:contain}
-.fp-fullscreen-overlay.with-panel .fp-fullscreen-inner{max-width:calc(100vw - 340px);max-height:92vh}
+.fp-fullscreen-viewport{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.fp-fullscreen-inner{position:relative;transform-origin:center center;transition:transform .12s ease-out;will-change:transform}
+.fp-fullscreen-inner img{display:block;max-width:95vw;max-height:88vh;object-fit:contain;user-select:none;-webkit-user-drag:none}
 .fp-fullscreen-overlay.with-panel .fp-fullscreen-inner img{max-width:calc(100vw - 340px);max-height:88vh}
 .fp-fullscreen-inner .card-fp-box{position:absolute;background:transparent;border:none;overflow:visible;display:flex;align-items:center}
 .fp-fullscreen-inner .fp-name{font-weight:700;line-height:1.2;white-space:nowrap;padding:2px 4px;text-shadow:0 0 4px #fff,0 0 4px #fff,0 0 8px #fff;pointer-events:none;width:100%;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis}
-.fp-fullscreen-close{position:absolute;top:10px;right:14px;width:36px;height:36px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10}
-.fp-fullscreen-title{position:absolute;top:10px;left:14px;background:rgba(0,0,0,.6);color:#fff;padding:6px 14px;border-radius:6px;font-size:13px;font-weight:600;z-index:10}
+.fp-fullscreen-close{position:absolute;top:10px;right:14px;width:40px;height:40px;background:rgba(0,0,0,.7);color:#fff;border:none;border-radius:50%;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10}
+.fp-fullscreen-title{position:absolute;top:10px;left:14px;background:rgba(0,0,0,.7);color:#fff;padding:8px 16px;border-radius:6px;font-size:13px;font-weight:600;z-index:10;max-width:calc(100% - 200px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 줌 컨트롤 (데스크톱 우하단 / 모바일 하단 중앙) */
+.fp-fullscreen-zoom{position:absolute;bottom:16px;right:16px;display:flex;flex-direction:column;background:rgba(0,0,0,.7);border-radius:10px;overflow:hidden;z-index:10;box-shadow:0 4px 16px rgba(0,0,0,.3)}
+.fp-fullscreen-zoom button{width:44px;height:44px;background:transparent;color:#fff;border:none;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .12s}
+.fp-fullscreen-zoom button:active{background:rgba(255,255,255,.15)}
+.fp-fullscreen-zoom .zoom-val{font-size:10px;color:#fff;text-align:center;padding:3px 0;border-top:1px solid rgba(255,255,255,.15);border-bottom:1px solid rgba(255,255,255,.15);font-family:'IBM Plex Mono',monospace}
+.fp-fullscreen-hint{position:absolute;bottom:16px;left:16px;background:rgba(0,0,0,.6);color:#fff;padding:6px 12px;border-radius:6px;font-size:11px;z-index:10;opacity:.85;pointer-events:none}
+@media(max-width:640px){
+  .fp-fullscreen-zoom{bottom:16px;right:50%;transform:translateX(50%);flex-direction:row}
+  .fp-fullscreen-zoom .zoom-val{border-top:none;border-bottom:none;border-left:1px solid rgba(255,255,255,.15);border-right:1px solid rgba(255,255,255,.15);padding:0 8px;display:flex;align-items:center}
+  .fp-fullscreen-hint{display:none}
+  .fp-fullscreen-overlay.with-panel{right:0;bottom:50%}
+}
+/* 상세 패널이 풀스크린 위에 항상 노출되도록 */
+body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;bottom:0;z-index:9500!important;width:300px;background:var(--paper2);border-left:1.5px solid var(--line)}
+@media(max-width:640px){
+  body > .detail-panel.fp-fullscreen-mode{width:100%;top:auto;bottom:0;height:50vh;border-left:none;border-top:1.5px solid var(--line)}
+}
 
 /* 카드 리사이즈 핸들 */
 .card-resize-handle{position:absolute;bottom:0;right:0;width:18px;height:18px;cursor:se-resize;z-index:20;opacity:0;transition:opacity .15s}
@@ -1113,24 +1130,58 @@ function buildFloorplanView(bName, fp) {
 function openFloorplanFullscreen(bName, fp) {
   document.querySelectorAll('.fp-fullscreen-overlay').forEach(el => el.remove());
   const overlay = document.createElement('div'); overlay.className = 'fp-fullscreen-overlay';
+  const viewport = document.createElement('div'); viewport.className = 'fp-fullscreen-viewport';
   const inner = document.createElement('div'); inner.className = 'fp-fullscreen-inner';
   const img = document.createElement('img'); img.src = fp.imgDataURL; img.draggable = false;
   inner.appendChild(img);
+  viewport.appendChild(inner);
+  overlay.appendChild(viewport);
 
   const title = document.createElement('div'); title.className = 'fp-fullscreen-title';
   title.textContent = `${bName} — ${fp.groupName || ''}`;
-  inner.appendChild(title);
+  overlay.appendChild(title);
 
-  // 상세 패널을 풀스크린 모드로 전환 (이미 열려있으면 보이게 유지, 닫혀있어도 클릭 시 오버레이 위로 노출)
+  // 줌 상태
+  let fpZoom = 1, fpPanX = 0, fpPanY = 0;
+  const MIN_Z = 0.5, MAX_Z = 6;
+  const applyFpTransform = () => {
+    inner.style.transform = `translate(${fpPanX}px,${fpPanY}px) scale(${fpZoom})`;
+    const zv = overlay.querySelector('.zoom-val');
+    if (zv) zv.textContent = Math.round(fpZoom * 100) + '%';
+  };
+  const setFpZoom = (z) => {
+    fpZoom = Math.min(MAX_Z, Math.max(MIN_Z, z));
+    if (fpZoom <= 1.01) { fpPanX = 0; fpPanY = 0; }
+    applyFpTransform();
+  };
+
+  // 줌 컨트롤
+  const zoomBar = document.createElement('div'); zoomBar.className = 'fp-fullscreen-zoom';
+  zoomBar.innerHTML = `<button type="button" data-z="in">+</button><div class="zoom-val">100%</div><button type="button" data-z="out">−</button><button type="button" data-z="reset" title="원래 크기">⟲</button>`;
+  zoomBar.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    const act = ev.target.closest('button')?.dataset.z;
+    if (act === 'in') setFpZoom(fpZoom * 1.25);
+    else if (act === 'out') setFpZoom(fpZoom / 1.25);
+    else if (act === 'reset') setFpZoom(1);
+  });
+  overlay.appendChild(zoomBar);
+
+  const hint = document.createElement('div'); hint.className = 'fp-fullscreen-hint';
+  hint.textContent = 'Ctrl+휠 확대 · 드래그 이동 · 두 손가락 확대';
+  overlay.appendChild(hint);
+
+  // 상세 패널 → 오버레이 위로 노출되도록 body로 이동
   const panel = document.getElementById('detailPanel');
+  const originalParent = panel.parentNode;
+  const originalNext = panel.nextSibling;
+  if (originalParent !== document.body) document.body.appendChild(panel);
   panel.classList.add('fp-fullscreen-mode');
   const updateOverlayWithPanel = () => {
     if (panel.classList.contains('open')) overlay.classList.add('with-panel');
     else overlay.classList.remove('with-panel');
-    // 이미지 박스 좌표는 % 기반이라 재렌더 불필요
   };
   updateOverlayWithPanel();
-  // 패널 열림/닫힘을 감시
   const panelObserver = new MutationObserver(updateOverlayWithPanel);
   panelObserver.observe(panel, { attributes: true, attributeFilter: ['class'] });
 
@@ -1138,17 +1189,116 @@ function openFloorplanFullscreen(bName, fp) {
     overlay.remove();
     panel.classList.remove('fp-fullscreen-mode');
     panelObserver.disconnect();
+    if (originalParent && panel.parentNode !== originalParent) {
+      if (originalNext && originalNext.parentNode === originalParent) originalParent.insertBefore(panel, originalNext);
+      else originalParent.appendChild(panel);
+    }
+    document.removeEventListener('keydown', escClose);
   };
 
   const closeBtn = document.createElement('button'); closeBtn.className = 'fp-fullscreen-close';
   closeBtn.textContent = '✕';
   closeBtn.addEventListener('click', (ev) => { ev.stopPropagation(); cleanup(); });
-  inner.appendChild(closeBtn);
+  overlay.appendChild(closeBtn);
 
-  overlay.appendChild(inner);
-  overlay.addEventListener('click', (ev) => { if (ev.target === overlay) cleanup(); });
-  document.addEventListener('keydown', function escClose(ev) {
-    if (ev.key === 'Escape') { cleanup(); document.removeEventListener('keydown', escClose); }
+  // 배경 클릭(뷰포트 빈 곳) → 닫기
+  viewport.addEventListener('click', (ev) => {
+    if (ev.target === viewport || ev.target === inner) cleanup();
+  });
+  function escClose(ev) {
+    if (ev.key === 'Escape') cleanup();
+  }
+  document.addEventListener('keydown', escClose);
+
+  // Ctrl+휠 확대축소 (포인터 기준)
+  overlay.addEventListener('wheel', (ev) => {
+    if (!(ev.ctrlKey || ev.metaKey)) return;
+    ev.preventDefault();
+    const step = fpZoom * 0.15;
+    const nz = Math.min(MAX_Z, Math.max(MIN_Z, fpZoom + (ev.deltaY > 0 ? -step : step)));
+    // 포인터 기준 줌: 이동 보정
+    const rect = viewport.getBoundingClientRect();
+    const cx = ev.clientX - rect.left - rect.width / 2;
+    const cy = ev.clientY - rect.top - rect.height / 2;
+    const k = nz / fpZoom;
+    fpPanX = cx - (cx - fpPanX) * k;
+    fpPanY = cy - (cy - fpPanY) * k;
+    fpZoom = nz;
+    if (fpZoom <= 1.01) { fpPanX = 0; fpPanY = 0; }
+    applyFpTransform();
+  }, { passive: false });
+
+  // 드래그 이동 (줌 상태일 때만)
+  let isDrag = false, dragSX = 0, dragSY = 0, dragPX0 = 0, dragPY0 = 0;
+  inner.addEventListener('mousedown', (ev) => {
+    if (fpZoom <= 1.01) return;
+    if (ev.target.closest('.card-fp-box')) return;
+    ev.preventDefault();
+    isDrag = true; dragSX = ev.clientX; dragSY = ev.clientY; dragPX0 = fpPanX; dragPY0 = fpPanY;
+    inner.style.transition = 'none';
+  });
+  window.addEventListener('mousemove', (ev) => {
+    if (!isDrag) return;
+    fpPanX = dragPX0 + (ev.clientX - dragSX);
+    fpPanY = dragPY0 + (ev.clientY - dragSY);
+    applyFpTransform();
+  });
+  window.addEventListener('mouseup', () => {
+    if (!isDrag) return;
+    isDrag = false; inner.style.transition = '';
+  });
+
+  // 터치 핀치줌 + 한 손가락 이동
+  let pinchD0 = 0, pinchZ0 = 1, pinchCx = 0, pinchCy = 0, pinchPX0 = 0, pinchPY0 = 0;
+  let touchMode = null; // 'pinch' | 'pan'
+  let tPanSX = 0, tPanSY = 0;
+  const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+  overlay.addEventListener('touchstart', (ev) => {
+    if (ev.target.closest('.fp-fullscreen-zoom') || ev.target.closest('.fp-fullscreen-close')) return;
+    if (ev.touches.length === 2) {
+      ev.preventDefault();
+      touchMode = 'pinch';
+      pinchD0 = dist(ev.touches[0], ev.touches[1]);
+      pinchZ0 = fpZoom;
+      const rect = viewport.getBoundingClientRect();
+      pinchCx = (ev.touches[0].clientX + ev.touches[1].clientX) / 2 - rect.left - rect.width / 2;
+      pinchCy = (ev.touches[0].clientY + ev.touches[1].clientY) / 2 - rect.top - rect.height / 2;
+      pinchPX0 = fpPanX; pinchPY0 = fpPanY;
+      inner.style.transition = 'none';
+    } else if (ev.touches.length === 1 && fpZoom > 1.01 && !ev.target.closest('.card-fp-box')) {
+      touchMode = 'pan';
+      tPanSX = ev.touches[0].clientX; tPanSY = ev.touches[0].clientY;
+      dragPX0 = fpPanX; dragPY0 = fpPanY;
+      inner.style.transition = 'none';
+    }
+  }, { passive: false });
+  overlay.addEventListener('touchmove', (ev) => {
+    if (touchMode === 'pinch' && ev.touches.length === 2) {
+      ev.preventDefault();
+      const d = dist(ev.touches[0], ev.touches[1]);
+      const nz = Math.min(MAX_Z, Math.max(MIN_Z, pinchZ0 * (d / pinchD0)));
+      const k = nz / pinchZ0;
+      fpPanX = pinchCx - (pinchCx - pinchPX0) * k;
+      fpPanY = pinchCy - (pinchCy - pinchPY0) * k;
+      fpZoom = nz;
+      applyFpTransform();
+    } else if (touchMode === 'pan' && ev.touches.length === 1) {
+      ev.preventDefault();
+      fpPanX = dragPX0 + (ev.touches[0].clientX - tPanSX);
+      fpPanY = dragPY0 + (ev.touches[0].clientY - tPanSY);
+      applyFpTransform();
+    }
+  }, { passive: false });
+  overlay.addEventListener('touchend', (ev) => {
+    if (ev.touches.length === 0) {
+      touchMode = null;
+      inner.style.transition = '';
+      if (fpZoom <= 1.01) { fpPanX = 0; fpPanY = 0; applyFpTransform(); }
+    } else if (ev.touches.length === 1 && touchMode === 'pinch') {
+      touchMode = 'pan';
+      tPanSX = ev.touches[0].clientX; tPanSY = ev.touches[0].clientY;
+      dragPX0 = fpPanX; dragPY0 = fpPanY;
+    }
   });
 
   const renderFSBoxes = () => {
@@ -2194,7 +2344,7 @@ function edLoadLayout(input) {
 // MAP BACKGROUND — OSM TILES
 // ═══════════════════════════════════════════════
 let mapBgOn = false;
-let mapScale = 1.5;
+let mapScale = 3.0;
 let mapShiftX = 0, mapShiftY = 0;
 let mapOpacity = 0.55;
 
@@ -2226,7 +2376,7 @@ function adjustMapBg(action) {
     case 'down':  mapShiftY += step; break;
     case 'left':  mapShiftX -= step; break;
     case 'right': mapShiftX += step; break;
-    case 'reset': mapScale = 1.5; mapShiftX = 0; mapShiftY = 0; break;
+    case 'reset': mapScale = 3.0; mapShiftX = 0; mapShiftY = 0; break;
   }
   applyMapTransform();
 }
