@@ -152,7 +152,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 .sheet-status.connected{background:var(--green-light);border-color:#86efac;color:var(--green)}
 .sheet-status.error{background:var(--red-light);border-color:#fca5a5;color:var(--red)}
 
-.building-selector{display:flex;gap:6px;align-items:center}
+.building-selector{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.building-selector .img-btn-row{display:flex;gap:6px;width:100%;align-items:center}
+.building-selector .img-btn-row .btn{flex:1;justify-content:center;display:flex;align-items:center}
 .building-selector select{flex:1;height:30px;border:1.5px solid var(--line);border-radius:7px;padding:0 8px;font-size:12px;font-family:inherit;background:var(--paper2);color:var(--text);outline:none}
 .building-selector select:focus{border-color:var(--blue)}
 
@@ -224,6 +226,15 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
   body > .detail-panel.fp-fullscreen-mode{width:100%;top:auto;bottom:0;height:50vh;border-left:none;border-top:1.5px solid var(--line)}
 }
 
+/* 건물 추가 팝오버 */
+.addbldg-item{padding:8px 10px;border-radius:6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;transition:background .12s}
+.addbldg-item:hover{background:#eff6ff}
+.addbldg-item:active{background:#dbeafe}
+/* 카드 삭제 버튼 (호버 시 표시) */
+.card-remove-btn{position:absolute;top:6px;right:6px;width:22px;height:22px;border:none;border-radius:50%;background:rgba(255,255,255,.85);color:#6b7280;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s,background .12s,color .12s;z-index:15;padding:0}
+.building-card:hover .card-remove-btn{opacity:1}
+.card-remove-btn:hover{background:#fee2e2;color:#dc2626}
+
 /* 레이어 합성 모드 */
 .compose-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:8000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;touch-action:none}
 .compose-stage{position:relative;background:#f3f4f6;border:2px solid #fff;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.4);background-image:linear-gradient(45deg,#e5e7eb 25%,transparent 25%),linear-gradient(-45deg,#e5e7eb 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e5e7eb 75%),linear-gradient(-45deg,transparent 75%,#e5e7eb 75%);background-size:20px 20px;background-position:0 0,0 10px,10px -10px,10px 0}
@@ -254,15 +265,17 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
 .crop-box .crop-handle.tr{top:-6px;right:-6px;cursor:ne-resize}
 .crop-box .crop-handle.bl{bottom:-6px;left:-6px;cursor:sw-resize}
 .crop-box .crop-handle.br{bottom:-6px;right:-6px;cursor:se-resize}
-.crop-toolbar{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:55;align-items:center;background:rgba(255,255,255,.95);padding:6px 10px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.2)}
+.crop-toolbar{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:55;align-items:center;background:rgba(255,255,255,.97);padding:6px 10px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.2);flex-wrap:wrap;max-width:92%}
 .crop-toolbar button{padding:6px 16px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
 .crop-toolbar .crop-ok{background:#2563eb;color:#fff}
 .crop-toolbar .crop-cancel{background:#f3f4f6;color:#333}
-.crop-pad-group{display:flex;align-items:center;gap:4px;padding-right:8px;border-right:1px solid #e5e7eb;margin-right:2px}
-.crop-pad-label{font-size:11px;color:#6b7280;font-weight:600}
-.crop-pad-btn{width:24px;height:24px;padding:0!important;background:#e5e7eb;color:#333;font-size:14px;border-radius:4px!important}
+.crop-pad-group{display:flex;align-items:center;gap:3px;padding:0 6px;border-right:1px solid #e5e7eb}
+.crop-pad-group:last-of-type{border-right:none}
+.crop-pad-label{font-size:11px;color:#6b7280;font-weight:700;min-width:14px;text-align:center}
+.crop-pad-btn{width:22px;height:22px;padding:0!important;background:#e5e7eb;color:#333;font-size:13px;border-radius:4px!important;display:flex;align-items:center;justify-content:center}
 .crop-pad-btn:hover{background:#d1d5db}
-.crop-pad-val{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;min-width:42px;text-align:center}
+.crop-pad-val{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;min-width:32px;text-align:center}
+.crop-pad-all{background:#eff6ff!important;color:#1d4ed8!important;border:1px solid #bfdbfe!important;padding:0 8px!important;height:22px;font-size:10px!important;border-radius:4px!important;font-weight:700;cursor:pointer}
 /* 고화질 평면도 오버레이 */
 .card-fp-container{position:relative;width:100%;border-radius:6px;border:1px solid var(--line);overflow:visible;background:#f8f9fe;cursor:pointer}
 .card-fp-container img{width:100%;display:block;image-rendering:auto}
@@ -464,15 +477,17 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
         <div class="building-selector">
           <select id="edBuildingSelect" style="height:28px;font-size:11px"><option value="">-- 건물 선택 --</option></select>
           <button class="btn primary" onclick="edLoadBuilding()" style="height:28px;font-size:11px;padding:0 10px">불러오기</button>
-          <label class="btn" style="cursor:pointer;height:28px;font-size:11px;padding:0 8px" title="평면도 이미지 업로드">
-            📁 이미지
-            <input type="file" id="edImgInput" accept="image/*" style="display:none" onchange="edHandleImage(this)">
-          </label>
-          <label class="btn" style="cursor:pointer;height:28px;font-size:11px;padding:0 8px" title="여러 이미지를 올려 하나의 평면도로 합치기 (A동+B동 등)">
-            🧩 합성
-            <input type="file" id="edComposeInput" accept="image/*" multiple style="display:none" onchange="edStartCompose(this)">
-          </label>
-          <button class="btn" onclick="edStartCrop()" style="height:28px;font-size:11px;padding:0 8px" title="평면도 외곽을 선택해서 잘라내고 흰 여백을 추가합니다">✂️ 크롭</button>
+          <div class="img-btn-row">
+            <label class="btn" style="cursor:pointer;height:30px;font-size:11px;padding:0 6px" title="평면도 이미지 업로드">
+              📁 이미지
+              <input type="file" id="edImgInput" accept="image/*" style="display:none" onchange="edHandleImage(this)">
+            </label>
+            <label class="btn" style="cursor:pointer;height:30px;font-size:11px;padding:0 6px;background:#eef2ff;border-color:#c7d2fe" title="여러 이미지를 올려 하나의 평면도로 합치기 (A동+B동 등)">
+              🧩 합성
+              <input type="file" id="edComposeInput" accept="image/*" multiple style="display:none" onchange="edStartCompose(this)">
+            </label>
+            <button class="btn" onclick="edStartCrop()" style="height:30px;font-size:11px;padding:0 6px;background:#fef3c7;border-color:#fde68a" title="평면도 외곽을 선택해서 잘라내고 흰 여백을 추가합니다">✂️ 크롭+여백</button>
+          </div>
         </div>
         <span id="edImgName" style="font-size:10px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
       </div>
@@ -592,6 +607,7 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
 // ═══════════════════════════════════════════════
 const STORAGE_KEY      = 'wirye_map_layout_v2';
 const FLOORPLAN_KEY    = 'wirye_floorplans_v2'; // 건물별 그룹명별 평면도 저장
+const ACTIVE_KEY       = 'wirye_active_buildings_v1'; // 전체지도에 표시할 건물 목록
 const SHEET_ID  = '19KWBXPiK-qXycopkNRHNMddmux2cKohtm7fLLyfiZGw';
 const SHEET_GID = '805020193';
 
@@ -621,6 +637,12 @@ let vacantOnly = false, searchQuery = '';
 let rawSheetRows = []; // 원본 시트 행 전체 보관
 let sheetHeaders = [];
 let buildingGroupRooms = {}; // { bName: { groupName: [rooms] } } — 시트 '그룹' 열 기반
+let activeBuildings = new Set(); // 전체지도 카드로 표시할 건물명들
+let _activeMigrated = false; // 최초 로드 시 기존 사용자 데이터 마이그레이션 플래그
+try {
+  const _a = localStorage.getItem(ACTIVE_KEY);
+  if (_a) { activeBuildings = new Set(JSON.parse(_a)); _activeMigrated = true; }
+} catch(e) {}
 
 // 자동 저장 (디바운스)
 let _autoSaveTimer = null;
@@ -871,13 +893,40 @@ function loadPositions() {
 function savePositions() { localStorage.setItem(STORAGE_KEY, JSON.stringify(positions)); showToast('✅ 배치 저장 완료'); cloudSaveAll(); }
 function getDefaultPosition(idx) { const c = idx % 3; const r = Math.floor(idx / 3); return { x: 40 + c*700, y: 40 + r*960 }; }
 
+// 기존 사용자 마이그레이션: ACTIVE_KEY가 한 번도 저장된 적 없고 positions에 항목이 있으면
+// 현재 buildings 중 positions에 cardId가 존재하는 것을 활성으로 자동 편입 (v1 이전 사용자 경험 보존)
+function migrateActiveBuildingsIfNeeded() {
+  if (_activeMigrated) return;
+  _activeMigrated = true;
+  if (localStorage.getItem(ACTIVE_KEY) !== null) return;
+  if (!positions || Object.keys(positions).length === 0) return;
+  const migrated = new Set();
+  Object.keys(buildings).forEach(bName => {
+    const cid = 'card_' + btoa(encodeURIComponent(bName)).replace(/[^a-zA-Z0-9]/g, '_');
+    if (positions[cid]) migrated.add(bName);
+  });
+  if (migrated.size > 0) {
+    activeBuildings = migrated;
+    saveActiveBuildings(false); // 클라우드 푸시는 생략 (저장 버튼 눌렀을 때 가도록)
+  }
+}
+
+function saveActiveBuildings(pushCloud) {
+  try { localStorage.setItem(ACTIVE_KEY, JSON.stringify([...activeBuildings])); } catch(e) {}
+  if (pushCloud !== false) { try { cloudSaveAll(); } catch(e) {} }
+}
+
 function renderAllCards() {
+  migrateActiveBuildingsIfNeeded();
   const canvas = document.getElementById('canvas');
   // 지도 타일 컨테이너 보존
   const mapContainer = document.getElementById('mapTileContainer');
   canvas.innerHTML = '';
   if (mapContainer) canvas.appendChild(mapContainer);
-  Object.keys(buildings).sort().forEach((bName, idx) => {
+
+  // activeBuildings만 렌더 (DB에 존재하는 것만)
+  const toRender = [...activeBuildings].filter(b => buildings[b]).sort();
+  toRender.forEach((bName, idx) => {
     const cardId = 'card_' + btoa(encodeURIComponent(bName)).replace(/[^a-zA-Z0-9]/g, '_');
     if (!cardStates[cardId]) {
       const dongs = buildings[bName];
@@ -888,7 +937,122 @@ function renderAllCards() {
     if (!positions[cardId]) positions[cardId] = getDefaultPosition(idx);
     canvas.appendChild(createCard(bName, cardId));
   });
+
+  // 빈 상태 안내
+  const existingEmpty = document.getElementById('mapEmptyState');
+  if (existingEmpty) existingEmpty.remove();
+  if (toRender.length === 0) {
+    const empty = document.createElement('div');
+    empty.id = 'mapEmptyState';
+    empty.style.cssText = 'position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);text-align:center;color:#6b7280;font-size:14px;pointer-events:auto;padding:20px 28px;background:rgba(255,255,255,.92);border:1.5px dashed #cbd5e1;border-radius:12px;max-width:360px;z-index:5;box-shadow:0 4px 16px rgba(0,0,0,.06)';
+    empty.innerHTML = `<div style="font-size:32px;margin-bottom:8px">🏢</div>
+      <div style="font-weight:700;color:#111827;margin-bottom:6px">지도에 표시할 건물을 추가하세요</div>
+      <div style="font-size:12px;line-height:1.5;color:#6b7280">상단의 <b style="color:#2563eb">＋ 건물 추가</b> 버튼을 눌러<br>원하는 건물 카드만 골라 배치할 수 있어요.</div>`;
+    canvas.appendChild(empty);
+  }
+
   updateStats();
+}
+
+// 지도에 건물 추가/제거
+function addBuildingToMap(bName) {
+  if (!buildings[bName]) { showToast('DB에 없는 건물입니다'); return; }
+  if (activeBuildings.has(bName)) { showToast('이미 지도에 있어요'); return; }
+  activeBuildings.add(bName);
+  // 기본 위치를 현재 시점의 인덱스 기준으로 부여 (기존 위치가 있으면 보존)
+  const cardId = 'card_' + btoa(encodeURIComponent(bName)).replace(/[^a-zA-Z0-9]/g, '_');
+  if (!positions[cardId]) positions[cardId] = getDefaultPosition(activeBuildings.size - 1);
+  saveActiveBuildings();
+  renderAllCards();
+  showToast(`✓ ${bName} 추가됨`);
+}
+
+function removeBuildingFromMap(bName) {
+  if (!activeBuildings.has(bName)) return;
+  if (!confirm(`'${bName}' 카드를 지도에서 제거할까요?\n(평면도/배치 데이터는 유지됩니다)`)) return;
+  activeBuildings.delete(bName);
+  saveActiveBuildings();
+  renderAllCards();
+  showToast(`${bName} 제거됨`);
+}
+
+// "+ 건물 추가" 팝오버
+function openAddBuildingPopup() {
+  const existing = document.getElementById('addBldgPopup');
+  if (existing) { existing.remove(); return; }
+  const anchor = document.getElementById('addBldgBtn');
+  if (!anchor) return;
+  const rect = anchor.getBoundingClientRect();
+
+  const pop = document.createElement('div');
+  pop.id = 'addBldgPopup';
+  pop.style.cssText = `position:fixed;top:${rect.bottom + 6}px;right:${window.innerWidth - rect.right}px;width:280px;max-height:70vh;background:#fff;border:1.5px solid #e5e7eb;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.15);z-index:9000;display:flex;flex-direction:column;overflow:hidden;font-size:12px`;
+
+  const available = Object.keys(buildings).filter(b => !activeBuildings.has(b)).sort();
+
+  pop.innerHTML = `
+    <div style="padding:10px 12px;border-bottom:1px solid #eef2f7;display:flex;gap:8px;align-items:center">
+      <input id="addBldgSearch" placeholder="건물명 검색..." style="flex:1;height:26px;border:1px solid #e5e7eb;border-radius:6px;padding:0 8px;font-size:12px;font-family:inherit;outline:none">
+      <button onclick="addAllBuildingsToMap()" style="height:26px;padding:0 10px;font-size:11px;border:none;border-radius:6px;background:#eff6ff;color:#1d4ed8;cursor:pointer;font-weight:700;white-space:nowrap" title="현재 DB의 모든 건물을 지도에 추가">전체 추가</button>
+    </div>
+    <div id="addBldgList" style="overflow:auto;max-height:calc(70vh - 58px);padding:4px"></div>
+    ${available.length === 0 ? '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:12px">추가할 건물이 없습니다</div>' : ''}
+  `;
+
+  document.body.appendChild(pop);
+
+  const renderList = (q) => {
+    const list = document.getElementById('addBldgList'); if (!list) return;
+    const ql = (q||'').toLowerCase().trim();
+    const filtered = available.filter(b => !ql || b.toLowerCase().includes(ql));
+    list.innerHTML = filtered.map(b => {
+      const cnt = Object.values(buildings[b]||{}).reduce((a,d)=>a+Object.values(d).reduce((x,rs)=>x+rs.length,0),0);
+      return `<div class="addbldg-item" onclick="addBuildingFromPopup('${escHtml(b).replace(/'/g,"\\'")}')">
+        <span style="font-weight:600;color:#111827">${escHtml(b)}</span>
+        <span style="color:#9ca3af;font-size:10px">${cnt}개 호실</span>
+      </div>`;
+    }).join('') || '<div style="padding:14px;text-align:center;color:#9ca3af;font-size:12px">검색 결과 없음</div>';
+  };
+  renderList('');
+
+  const searchEl = document.getElementById('addBldgSearch');
+  if (searchEl) {
+    searchEl.addEventListener('input', e => renderList(e.target.value));
+    setTimeout(() => searchEl.focus(), 30);
+  }
+
+  // 바깥 클릭 시 닫기
+  setTimeout(() => {
+    const closer = (ev) => {
+      if (!pop.contains(ev.target) && ev.target !== anchor) {
+        pop.remove();
+        document.removeEventListener('mousedown', closer);
+      }
+    };
+    document.addEventListener('mousedown', closer);
+  }, 0);
+}
+
+function addBuildingFromPopup(bName) {
+  addBuildingToMap(bName);
+  const pop = document.getElementById('addBldgPopup');
+  if (pop) { pop.remove(); }
+  // 바로 다시 열어서 연속 추가 가능하게 하려면 openAddBuildingPopup() 호출. 지금은 닫음.
+}
+
+function addAllBuildingsToMap() {
+  const missing = Object.keys(buildings).filter(b => !activeBuildings.has(b));
+  if (!missing.length) { showToast('이미 모두 추가되어 있어요'); return; }
+  if (!confirm(`${missing.length}개 건물을 모두 지도에 추가할까요?`)) return;
+  missing.forEach((bName, i) => {
+    activeBuildings.add(bName);
+    const cardId = 'card_' + btoa(encodeURIComponent(bName)).replace(/[^a-zA-Z0-9]/g, '_');
+    if (!positions[cardId]) positions[cardId] = getDefaultPosition(activeBuildings.size - 1 + i);
+  });
+  saveActiveBuildings();
+  renderAllCards();
+  const pop = document.getElementById('addBldgPopup'); if (pop) pop.remove();
+  showToast(`✓ ${missing.length}개 건물 추가됨`);
 }
 
 function createCard(bName, cardId) {
@@ -2135,12 +2299,20 @@ function edComposeApply() {
 }
 
 // ── 크롭 기능 ──
-let edCropPad = 100; // 상하좌우 동일 여백 (px)
+// 4방향 여백 (px) — 상/하/좌/우 개별 조절
+let edCropPad = { top: 100, bottom: 100, left: 100, right: 100 };
+const EDCROP_SIDES = ['top', 'bottom', 'left', 'right'];
 
-function edAdjustCropPad(delta) {
-  edCropPad = Math.max(0, Math.min(400, edCropPad + delta));
-  const el = document.getElementById('edCropPadVal');
-  if (el) el.textContent = edCropPad + 'px';
+function edAdjustCropPad(side, delta) {
+  if (side === 'all') {
+    EDCROP_SIDES.forEach(s => { edCropPad[s] = Math.max(0, Math.min(800, edCropPad[s] + delta)); });
+  } else {
+    edCropPad[side] = Math.max(0, Math.min(800, edCropPad[side] + delta));
+  }
+  EDCROP_SIDES.forEach(s => {
+    const el = document.getElementById('edCropPadVal_' + s);
+    if (el) el.textContent = edCropPad[s];
+  });
 }
 
 function edStartCrop() {
@@ -2161,14 +2333,23 @@ function edStartCrop() {
   });
 
   const toolbar = document.createElement('div'); toolbar.className = 'crop-toolbar';
+  const padGroup = (side, label, title) => `
+    <div class="crop-pad-group" title="${title} 여백(px)">
+      <span class="crop-pad-label">${label}</span>
+      <button class="crop-pad-btn" onclick="edAdjustCropPad('${side}',-20)">−</button>
+      <span class="crop-pad-val" id="edCropPadVal_${side}">${edCropPad[side]}</span>
+      <button class="crop-pad-btn" onclick="edAdjustCropPad('${side}',20)">+</button>
+    </div>`;
   toolbar.innerHTML = `
-    <div class="crop-pad-group">
-      <span class="crop-pad-label">여백</span>
-      <button class="crop-pad-btn" onclick="edAdjustCropPad(-20)">−</button>
-      <span class="crop-pad-val" id="edCropPadVal">100px</span>
-      <button class="crop-pad-btn" onclick="edAdjustCropPad(20)">+</button>
+    ${padGroup('top', '↑', '상')}
+    ${padGroup('bottom', '↓', '하')}
+    ${padGroup('left', '←', '좌')}
+    ${padGroup('right', '→', '우')}
+    <div class="crop-pad-group" style="border-right:none">
+      <button class="crop-pad-all" onclick="edAdjustCropPad('all',-20)" title="모두 -20">전체−</button>
+      <button class="crop-pad-all" onclick="edAdjustCropPad('all',20)" title="모두 +20">전체+</button>
     </div>
-    <button class="crop-ok" onclick="edApplyCrop()">✓ 잘라내기 + 여백</button>
+    <button class="crop-ok" onclick="edApplyCrop()">✓ 잘라내기+여백</button>
     <button class="crop-cancel" onclick="edCancelCrop()">취소</button>
   `;
 
@@ -2246,16 +2427,17 @@ function edApplyCrop() {
   const sx = Math.round(cl * srcW), sy = Math.round(ct * srcH);
   const sw = Math.round(cw * srcW), sh = Math.round(ch * srcH);
 
-  // 여백: 상하좌우 동일 (사용자 조절값)
-  const padX = edCropPad, padY = edCropPad;
-  const outW = sw + padX * 2, outH = sh + padY * 2;
+  // 여백: 상/하/좌/우 개별 (사용자 조절값)
+  const padT = edCropPad.top, padB = edCropPad.bottom;
+  const padL = edCropPad.left, padR = edCropPad.right;
+  const outW = sw + padL + padR, outH = sh + padT + padB;
 
   const cvs = document.createElement('canvas');
   cvs.width = outW; cvs.height = outH;
   const ctx = cvs.getContext('2d');
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, outW, outH);
-  ctx.drawImage(img, sx, sy, sw, sh, padX, padY, sw, sh);
+  ctx.drawImage(img, sx, sy, sw, sh, padL, padT, sw, sh);
 
   // 배치된 박스 좌표(%)를 새 캔버스 기준으로 재계산
   for (const key of Object.keys(edBoxes)) {
@@ -2264,8 +2446,8 @@ function edApplyCrop() {
     const absY = b.y / 100 * srcH;
     const absW = b.w / 100 * srcW;
     const absH = b.h / 100 * srcH;
-    const newAbsX = absX - sx + padX;
-    const newAbsY = absY - sy + padY;
+    const newAbsX = absX - sx + padL;
+    const newAbsY = absY - sy + padT;
     b.x = newAbsX / outW * 100;
     b.y = newAbsY / outH * 100;
     b.w = absW / outW * 100;
@@ -2286,7 +2468,7 @@ function edApplyCrop() {
   };
 
   edCancelCrop();
-  showToast(`✂️ 크롭 완료 — ${outW}×${outH}px, 여백 ${padX}×${padY}px 추가`);
+  showToast(`✂️ 크롭 완료 — ${outW}×${outH}px (여백 ↑${padT} ↓${padB} ←${padL} →${padR})`);
 }
 
 // ── 동 탭 ──
