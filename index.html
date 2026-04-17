@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>위례 트램라인 상가지도</title>
 <meta name="description" content="위례 신도시 트램라인 상권 전체 상가 지도 - 건물별 층별 평면도 및 호실 정보">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" async></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=IBM+Plex+Mono:wght@400;600&display=swap');
 
@@ -553,7 +553,15 @@ const SHEET_GID = '805020193';
 const SUPABASE_URL = 'https://oqubhlvqgwxnduukizxb.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9xdWJobHZxZ3d4bmR1dWtpenhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzMjY0OTksImV4cCI6MjA5MTkwMjQ5OX0.jMxF567fwJwIcTEhVsHabhyLo6isDZe2OpVjnPIioxk';
 const SUPABASE_BUCKET = 'floorplans';
-const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+let _supabaseClient = null;
+function getSupabase() {
+  if (_supabaseClient) return _supabaseClient;
+  if (window.supabase?.createClient) {
+    _supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    return _supabaseClient;
+  }
+  return null;
+}
 
 let buildings = {};   // { bName: { dong: { floor: [rooms] } } }
 let cardStates = {};
@@ -682,6 +690,17 @@ function parseCSV(text) {
 }
 
 function loadData() {
+  // 안전 타임아웃: 20초 후에도 로딩이면 강제 해제하고 빈 상태로 진입
+  const safetyTimer = setTimeout(() => {
+    const ov = document.getElementById('loadingOverlay');
+    if (ov && ov.style.display !== 'none') {
+      ov.style.display = 'none';
+      showToast('⚠️ 데이터 로드 타임아웃 — 로컬 데이터로 시작');
+      if (Object.keys(buildings).length === 0) buildings = {};
+      try { initMap(); } catch(e) { console.error('initMap failed:', e); }
+    }
+  }, 20000);
+  const clearSafety = () => clearTimeout(safetyTimer);
   const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${SHEET_GID}`;
   const gvizUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${SHEET_GID}`;
 
@@ -708,6 +727,7 @@ function loadData() {
       } catch (e) {
         throw e; // fallback으로 전달
       }
+      clearSafety();
       document.getElementById('loadingOverlay').style.display = 'none';
       initMap();
     })
@@ -745,6 +765,7 @@ function loadData() {
           initMap();
         })
         .catch(() => {
+          clearSafety();
           showToast('구글 시트 연결 실패');
           document.getElementById('loadingOverlay').style.display = 'none';
           document.getElementById('edSheetStatus').className = 'sheet-status error';
@@ -778,10 +799,14 @@ function initMap() {
   renderAllCards();
   updateStats();
   applyTransform();
-  // 클라우드에서 비동기 로드 (로컬보다 최신이면 덮어씀)
-  cloudLoadAll().then(loaded => {
-    if (loaded) { renderAllCards(); updateStats(); }
-  });
+  // 클라우드에서 비동기 로드 (로컬보다 최신이면 덮어씀) — 에러는 로컬 렌더에 영향 없음
+  setTimeout(() => {
+    try {
+      cloudLoadAll().then(loaded => {
+        if (loaded) { renderAllCards(); updateStats(); }
+      }).catch(e => console.warn('cloudLoadAll failed:', e));
+    } catch(e) { console.warn('cloud init skipped:', e); }
+  }, 500);
 }
 
 function loadPositions() {
@@ -2259,6 +2284,7 @@ function updateSyncStatus(msg, isError) {
 }
 
 async function cloudSaveAll() {
+  const supabase = getSupabase();
   if (!supabase) { updateSyncStatus('Supabase 미연결', true); return; }
   updateSyncStatus('☁️ 업로드 중...');
 
@@ -2309,6 +2335,7 @@ async function cloudSaveAll() {
 }
 
 async function cloudLoadAll() {
+  const supabase = getSupabase();
   if (!supabase) return false;
   updateSyncStatus('☁️ 다운로드 중...');
 
@@ -2341,17 +2368,8 @@ async function cloudLoadAll() {
           const path = `img/${safeName(bName)}_${safeName(gName)}`;
           const { data: urlData } = supabase.storage
             .from(SUPABASE_BUCKET).getPublicUrl(path);
-          const publicUrl = urlData?.publicUrl;
-
-          // 이미지가 실제 존재하는지 확인
-          let imgURL = localData?.imgDataURL || '';
-          if (publicUrl) {
-            try {
-              const check = await fetch(publicUrl, { method: 'HEAD' });
-              if (check.ok) imgURL = publicUrl + '?t=' + Date.now();
-            } catch(e) { /* 네트워크 오류 시 로컬 이미지 유지 */ }
-          }
-
+          // 이미지는 즉시 public URL 사용 (없으면 img onerror로 대체)
+          const imgURL = urlData?.publicUrl || localData?.imgDataURL || '';
           floorplans[bName][gName] = { ...gData, imgDataURL: imgURL };
         }
       }
