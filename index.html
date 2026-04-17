@@ -58,7 +58,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 .canvas{position:absolute;top:0;left:0;width:3000px;height:3000px;transform-origin:0 0}
 
 /* Building Card */
-.building-card{position:absolute;width:320px;min-width:200px;background:var(--paper2);border-radius:12px;border:1.5px solid var(--line);box-shadow:var(--shadow-lg);display:flex;flex-direction:column;overflow:hidden;transition:box-shadow .15s,width .3s;user-select:none}
+.building-card{position:absolute;width:640px;min-width:400px;background:var(--paper2);border-radius:12px;border:1.5px solid var(--line);box-shadow:var(--shadow-lg);display:flex;flex-direction:column;overflow:hidden;transition:box-shadow .15s,width .3s;user-select:none}
 .building-card:hover{box-shadow:0 12px 40px rgba(0,0,0,.18)}
 .building-card.dragging{box-shadow:0 20px 60px rgba(37,99,235,.25);border-color:var(--blue-mid);z-index:100!important}
 .card-header{background:var(--blue);padding:10px 12px 8px;cursor:move;display:flex;flex-direction:column;gap:6px}
@@ -102,6 +102,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 
 /* Detail Panel */
 .detail-panel{width:300px;background:var(--paper2);border-left:1.5px solid var(--line);display:flex;flex-direction:column;flex-shrink:0;transform:translateX(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);position:absolute;right:0;top:0;bottom:0;z-index:150;box-shadow:-4px 0 20px rgba(0,0,0,.1)}
+.detail-panel.fp-fullscreen-mode{position:fixed;top:0;right:0;bottom:0;z-index:9500}
 .detail-panel.open{transform:translateX(0)}
 .panel-header{padding:14px 16px 12px;background:var(--blue);color:#fff;display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
 .panel-title{font-weight:700;font-size:15px;line-height:1.3;letter-spacing:-.3px}
@@ -195,9 +196,12 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 .card-floorplan-info{font-size:9px;color:var(--text3);padding:3px 8px 6px;text-align:right}
 
 /* 평면도 풀스크린 오버레이 */
-.fp-fullscreen-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);z-index:9000;display:flex;align-items:center;justify-content:center;cursor:zoom-out}
+.fp-fullscreen-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);z-index:9000;display:flex;align-items:center;justify-content:center;cursor:zoom-out;transition:right .25s cubic-bezier(.4,0,.2,1)}
+.fp-fullscreen-overlay.with-panel{right:300px}
 .fp-fullscreen-inner{position:relative;max-width:95vw;max-height:92vh;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 20px 80px rgba(0,0,0,.5)}
 .fp-fullscreen-inner img{display:block;max-width:95vw;max-height:88vh;object-fit:contain}
+.fp-fullscreen-overlay.with-panel .fp-fullscreen-inner{max-width:calc(100vw - 340px);max-height:92vh}
+.fp-fullscreen-overlay.with-panel .fp-fullscreen-inner img{max-width:calc(100vw - 340px);max-height:88vh}
 .fp-fullscreen-inner .card-fp-box{position:absolute;background:transparent;border:none;overflow:visible;display:flex;align-items:center}
 .fp-fullscreen-inner .fp-name{font-weight:700;line-height:1.2;white-space:nowrap;padding:2px 4px;text-shadow:0 0 4px #fff,0 0 4px #fff,0 0 8px #fff;pointer-events:none;width:100%;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis}
 .fp-fullscreen-close{position:absolute;top:10px;right:14px;width:36px;height:36px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10}
@@ -217,10 +221,15 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 .crop-box .crop-handle.tr{top:-6px;right:-6px;cursor:ne-resize}
 .crop-box .crop-handle.bl{bottom:-6px;left:-6px;cursor:sw-resize}
 .crop-box .crop-handle.br{bottom:-6px;right:-6px;cursor:se-resize}
-.crop-toolbar{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:55}
+.crop-toolbar{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:55;align-items:center;background:rgba(255,255,255,.95);padding:6px 10px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.2)}
 .crop-toolbar button{padding:6px 16px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
 .crop-toolbar .crop-ok{background:#2563eb;color:#fff}
-.crop-toolbar .crop-cancel{background:#fff;color:#333}
+.crop-toolbar .crop-cancel{background:#f3f4f6;color:#333}
+.crop-pad-group{display:flex;align-items:center;gap:4px;padding-right:8px;border-right:1px solid #e5e7eb;margin-right:2px}
+.crop-pad-label{font-size:11px;color:#6b7280;font-weight:600}
+.crop-pad-btn{width:24px;height:24px;padding:0!important;background:#e5e7eb;color:#333;font-size:14px;border-radius:4px!important}
+.crop-pad-btn:hover{background:#d1d5db}
+.crop-pad-val{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;min-width:42px;text-align:center}
 /* 고화질 평면도 오버레이 */
 .card-fp-container{position:relative;width:100%;border-radius:6px;border:1px solid var(--line);overflow:visible;background:#f8f9fe;cursor:pointer}
 .card-fp-container img{width:100%;display:block;image-rendering:auto}
@@ -823,7 +832,7 @@ function loadPositions() {
   } catch(e) { floorplans = {}; }
 }
 function savePositions() { localStorage.setItem(STORAGE_KEY, JSON.stringify(positions)); showToast('✅ 배치 저장 완료'); cloudSaveAll(); }
-function getDefaultPosition(idx) { const c = idx % 3; const r = Math.floor(idx / 3); return { x: 40 + c*350, y: 40 + r*480 }; }
+function getDefaultPosition(idx) { const c = idx % 3; const r = Math.floor(idx / 3); return { x: 40 + c*700, y: 40 + r*960 }; }
 
 function renderAllCards() {
   const canvas = document.getElementById('canvas');
@@ -1038,10 +1047,10 @@ function buildFloorplanView(bName, fp) {
     const cid = card?.id;
     const userSized = cid && positions[cid]?.w;
     if (card && !userSized && ratio > 1.3) {
-      const newW = Math.min(960, Math.round(320 * ratio));
+      const newW = Math.min(1920, Math.round(640 * ratio));
       card.style.width = newW + 'px';
     } else if (card && !userSized && ratio < 0.6) {
-      card.style.width = Math.max(200, Math.round(320 * ratio * 1.2)) + 'px';
+      card.style.width = Math.max(400, Math.round(640 * ratio * 1.2)) + 'px';
     }
     const cW = container.offsetWidth || 300;
     const scale = cW / natW;
@@ -1112,15 +1121,34 @@ function openFloorplanFullscreen(bName, fp) {
   title.textContent = `${bName} — ${fp.groupName || ''}`;
   inner.appendChild(title);
 
+  // 상세 패널을 풀스크린 모드로 전환 (이미 열려있으면 보이게 유지, 닫혀있어도 클릭 시 오버레이 위로 노출)
+  const panel = document.getElementById('detailPanel');
+  panel.classList.add('fp-fullscreen-mode');
+  const updateOverlayWithPanel = () => {
+    if (panel.classList.contains('open')) overlay.classList.add('with-panel');
+    else overlay.classList.remove('with-panel');
+    // 이미지 박스 좌표는 % 기반이라 재렌더 불필요
+  };
+  updateOverlayWithPanel();
+  // 패널 열림/닫힘을 감시
+  const panelObserver = new MutationObserver(updateOverlayWithPanel);
+  panelObserver.observe(panel, { attributes: true, attributeFilter: ['class'] });
+
+  const cleanup = () => {
+    overlay.remove();
+    panel.classList.remove('fp-fullscreen-mode');
+    panelObserver.disconnect();
+  };
+
   const closeBtn = document.createElement('button'); closeBtn.className = 'fp-fullscreen-close';
   closeBtn.textContent = '✕';
-  closeBtn.addEventListener('click', (ev) => { ev.stopPropagation(); overlay.remove(); });
+  closeBtn.addEventListener('click', (ev) => { ev.stopPropagation(); cleanup(); });
   inner.appendChild(closeBtn);
 
   overlay.appendChild(inner);
-  overlay.addEventListener('click', (ev) => { if (ev.target === overlay) overlay.remove(); });
+  overlay.addEventListener('click', (ev) => { if (ev.target === overlay) cleanup(); });
   document.addEventListener('keydown', function escClose(ev) {
-    if (ev.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', escClose); }
+    if (ev.key === 'Escape') { cleanup(); document.removeEventListener('keydown', escClose); }
   });
 
   const renderFSBoxes = () => {
@@ -1667,6 +1695,14 @@ function edHandleImage(input) {
 }
 
 // ── 크롭 기능 ──
+let edCropPad = 100; // 상하좌우 동일 여백 (px)
+
+function edAdjustCropPad(delta) {
+  edCropPad = Math.max(0, Math.min(400, edCropPad + delta));
+  const el = document.getElementById('edCropPadVal');
+  if (el) el.textContent = edCropPad + 'px';
+}
+
 function edStartCrop() {
   if (!edImageURL) { showToast('먼저 평면도 이미지를 업로드하세요'); return; }
   const wrap = document.getElementById('edCanvasWrapper');
@@ -1686,7 +1722,13 @@ function edStartCrop() {
 
   const toolbar = document.createElement('div'); toolbar.className = 'crop-toolbar';
   toolbar.innerHTML = `
-    <button class="crop-ok" onclick="edApplyCrop()">✓ 잘라내기 + 여백 추가</button>
+    <div class="crop-pad-group">
+      <span class="crop-pad-label">여백</span>
+      <button class="crop-pad-btn" onclick="edAdjustCropPad(-20)">−</button>
+      <span class="crop-pad-val" id="edCropPadVal">100px</span>
+      <button class="crop-pad-btn" onclick="edAdjustCropPad(20)">+</button>
+    </div>
+    <button class="crop-ok" onclick="edApplyCrop()">✓ 잘라내기 + 여백</button>
     <button class="crop-cancel" onclick="edCancelCrop()">취소</button>
   `;
 
@@ -1764,8 +1806,8 @@ function edApplyCrop() {
   const sx = Math.round(cl * srcW), sy = Math.round(ct * srcH);
   const sw = Math.round(cw * srcW), sh = Math.round(ch * srcH);
 
-  // 여백: 텍스트박스 기본 폭 135px + 여유 → 양쪽 각 150px 이상 확보
-  const padX = 160, padY = 60;
+  // 여백: 상하좌우 동일 (사용자 조절값)
+  const padX = edCropPad, padY = edCropPad;
   const outW = sw + padX * 2, outH = sh + padY * 2;
 
   const cvs = document.createElement('canvas');
@@ -2152,7 +2194,7 @@ function edLoadLayout(input) {
 // MAP BACKGROUND — OSM TILES
 // ═══════════════════════════════════════════════
 let mapBgOn = false;
-let mapScale = 1.0;
+let mapScale = 1.5;
 let mapShiftX = 0, mapShiftY = 0;
 let mapOpacity = 0.55;
 
@@ -2184,7 +2226,7 @@ function adjustMapBg(action) {
     case 'down':  mapShiftY += step; break;
     case 'left':  mapShiftX -= step; break;
     case 'right': mapShiftX += step; break;
-    case 'reset': mapScale = 1.0; mapShiftX = 0; mapShiftY = 0; break;
+    case 'reset': mapScale = 1.5; mapShiftX = 0; mapShiftY = 0; break;
   }
   applyMapTransform();
 }
@@ -2334,6 +2376,15 @@ async function cloudSaveAll() {
   }
 }
 
+function blobToDataURL(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
 async function cloudLoadAll() {
   const supabase = getSupabase();
   if (!supabase) return false;
@@ -2343,7 +2394,11 @@ async function cloudLoadAll() {
     // 1) _data.json 다운로드
     const { data: dataFile, error: dataErr } = await supabase.storage
       .from(SUPABASE_BUCKET).download('_data.json');
-    if (dataErr || !dataFile) { updateSyncStatus(''); return false; }
+    if (dataErr || !dataFile) {
+      console.warn('cloud _data.json not found:', dataErr?.message);
+      updateSyncStatus('');
+      return false;
+    }
 
     const cloudData = JSON.parse(await dataFile.text());
 
@@ -2355,7 +2410,10 @@ async function cloudLoadAll() {
       if (Object.keys(cloudPos).length > 0) positions = cloudPos;
     }
 
-    // 3) 이미지 URL 복원 (Supabase public URL 사용)
+    // 3) 각 이미지 다운로드 → base64로 로컬에 저장 (다른 기기에서도 동작)
+    const downloads = [];
+    let imgCount = 0, imgDone = 0;
+
     for (const [bName, groups] of Object.entries(cloudData)) {
       if (!floorplans[bName]) floorplans[bName] = {};
       for (const [gName, gData] of Object.entries(groups)) {
@@ -2363,23 +2421,43 @@ async function cloudLoadAll() {
         const localTime = localData?.savedAt || '';
         const cloudTime = gData.savedAt || '';
 
-        // 클라우드가 더 최신이거나 로컬에 없으면 → 클라우드 데이터 사용
         if (!localData || cloudTime >= localTime) {
+          floorplans[bName][gName] = { ...gData, imgDataURL: localData?.imgDataURL || '' };
+
+          // 이미 로컬에 data: URL이 있으면 재다운로드 건너뜀
+          const existing = localData?.imgDataURL || '';
+          if (existing.startsWith('data:')) continue;
+
+          imgCount++;
           const path = `img/${safeName(bName)}_${safeName(gName)}`;
-          const { data: urlData } = supabase.storage
-            .from(SUPABASE_BUCKET).getPublicUrl(path);
-          // 이미지는 즉시 public URL 사용 (없으면 img onerror로 대체)
-          const imgURL = urlData?.publicUrl || localData?.imgDataURL || '';
-          floorplans[bName][gName] = { ...gData, imgDataURL: imgURL };
+          downloads.push(
+            supabase.storage.from(SUPABASE_BUCKET).download(path)
+              .then(async ({ data: imgBlob, error: imgErr }) => {
+                imgDone++;
+                updateSyncStatus(`☁️ 이미지 ${imgDone}/${imgCount} 다운로드 중...`);
+                if (imgErr || !imgBlob) {
+                  console.warn('img download failed:', path, imgErr?.message);
+                  return;
+                }
+                try {
+                  const dataURL = await blobToDataURL(imgBlob);
+                  floorplans[bName][gName].imgDataURL = dataURL;
+                } catch(e) { console.warn('blob2dataURL error:', e); }
+              })
+              .catch(e => console.warn('img fetch error:', path, e))
+          );
         }
       }
     }
 
-    // localStorage 갱신
-    try { localStorage.setItem(FLOORPLAN_KEY, JSON.stringify(floorplans)); } catch(e) {}
+    await Promise.all(downloads);
+
+    // localStorage 갱신 (용량 초과 시 경고만 출력)
+    try { localStorage.setItem(FLOORPLAN_KEY, JSON.stringify(floorplans)); }
+    catch(e) { console.warn('localStorage full — images will still render from memory:', e.message); }
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(positions)); } catch(e) {}
 
-    updateSyncStatus('☁️ 동기화 완료');
+    updateSyncStatus(`☁️ 동기화 완료 (이미지 ${imgDone}/${imgCount})`);
     return true;
   } catch (e) {
     console.error('cloudLoadAll error:', e);
