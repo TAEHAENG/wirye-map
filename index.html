@@ -208,6 +208,14 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 .fp-fullscreen-inner .fp-name{font-weight:700;line-height:1.2;white-space:nowrap;padding:2px 4px;text-shadow:0 0 4px #fff,0 0 4px #fff,0 0 8px #fff;pointer-events:none;width:100%;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis}
 .fp-fullscreen-close{position:absolute;top:10px;right:14px;width:40px;height:40px;background:rgba(0,0,0,.7);color:#fff;border:none;border-radius:50%;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10}
 .fp-fullscreen-title{position:absolute;top:10px;left:14px;background:rgba(0,0,0,.7);color:#fff;padding:8px 16px;border-radius:6px;font-size:13px;font-weight:600;z-index:10;max-width:calc(100% - 200px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fp-fullscreen-floors{position:absolute;top:56px;left:14px;display:flex;gap:4px;background:rgba(0,0,0,.55);padding:4px;border-radius:8px;z-index:10;max-width:calc(100% - 28px);overflow-x:auto;flex-wrap:wrap}
+.fp-fullscreen-floor-btn{padding:5px 11px;font-size:11px;font-weight:700;color:#fff;background:transparent;border:1px solid rgba(255,255,255,.25);border-radius:5px;cursor:pointer;transition:background .12s,border-color .12s;font-family:inherit;white-space:nowrap}
+.fp-fullscreen-floor-btn:hover{background:rgba(255,255,255,.12)}
+.fp-fullscreen-floor-btn.active{background:#2563eb;border-color:#2563eb}
+@media(max-width:640px){
+  .fp-fullscreen-floors{top:52px;left:8px;right:8px;max-width:calc(100% - 16px);padding:3px}
+  .fp-fullscreen-floor-btn{padding:5px 9px;font-size:10px}
+}
 /* 줌 컨트롤 (데스크톱 우하단 / 모바일 하단 중앙) */
 .fp-fullscreen-zoom{position:absolute;bottom:16px;right:16px;display:flex;flex-direction:column;background:rgba(0,0,0,.7);border-radius:10px;overflow:hidden;z-index:10;box-shadow:0 4px 16px rgba(0,0,0,.3)}
 .fp-fullscreen-zoom button{width:44px;height:44px;background:transparent;color:#fff;border:none;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .12s}
@@ -406,6 +414,7 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
   </div>
 
   <div class="topbar-actions" id="mapActions">
+    <button class="btn primary" id="addBldgBtn" title="DB에서 건물을 골라 지도에 추가합니다" onclick="openAddBuildingPopup()" style="font-size:11px">＋ 건물 추가</button>
     <button class="filter-toggle" id="mapBgBtn" title="배경에 OSM 지도를 표시/숨김합니다" onclick="toggleMapBg()">🗺️ 지도</button>
     <button class="filter-toggle" id="vacantFilter" title="공실만 보기">공실만</button>
     <button class="btn" id="resetLayout" title="배치 초기화">↻ 초기화</button>
@@ -644,13 +653,18 @@ try {
   if (_a) { activeBuildings = new Set(JSON.parse(_a)); _activeMigrated = true; }
 } catch(e) {}
 
-// 자동 저장 (디바운스)
+// 자동 저장 (디바운스) — 로컬은 빠르게, 클라우드는 느리게
 let _autoSaveTimer = null;
+let _autoCloudTimer = null;
 function autoSavePositions() {
   clearTimeout(_autoSaveTimer);
   _autoSaveTimer = setTimeout(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(positions));
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(positions)); } catch(e) {}
   }, 800);
+  clearTimeout(_autoCloudTimer);
+  _autoCloudTimer = setTimeout(() => {
+    try { cloudSaveAll(); } catch(e) {}
+  }, 3500);
 }
 
 const FLOOR_ORDER = f => {
@@ -867,11 +881,13 @@ function initMap() {
   renderAllCards();
   updateStats();
   applyTransform();
+  // 저장된 지도 배경 상태 복원 (mapBgOn=true였다면 자동으로 켜기)
+  applyMapBgFromState();
   // 클라우드에서 비동기 로드 (로컬보다 최신이면 덮어씀) — 에러는 로컬 렌더에 영향 없음
   setTimeout(() => {
     try {
       cloudLoadAll().then(loaded => {
-        if (loaded) { renderAllCards(); updateStats(); }
+        if (loaded) { renderAllCards(); updateStats(); applyMapBgFromState(); applyMapTransform(); }
       }).catch(e => console.warn('cloudLoadAll failed:', e));
     } catch(e) { console.warn('cloud init skipped:', e); }
   }, 500);
@@ -1062,7 +1078,7 @@ function createCard(bName, cardId) {
   card.style.left=pos.x+'px'; card.style.top=pos.y+'px'; card.style.zIndex=10;
   let totalRooms=0;
   Object.values(dongs).forEach(fl => Object.values(fl).forEach(rs => totalRooms+=rs.length));
-  card.innerHTML=`<div class="card-header" data-drag="true"><div class="card-title-row"><div class="card-building-name">${escHtml(bName)}</div><div class="card-grip"><span></span><span></span><span></span></div></div><div class="card-room-count">전체 ${totalRooms}개 호실</div></div>`;
+  card.innerHTML=`<div class="card-header" data-drag="true"><div class="card-title-row"><div class="card-building-name">${escHtml(bName)}</div><div class="card-grip"><span></span><span></span><span></span></div></div><div class="card-room-count">전체 ${totalRooms}개 호실</div></div><button class="card-remove-btn" title="지도에서 제거" onclick="event.stopPropagation();removeBuildingFromMap('${escHtml(bName).replace(/'/g,"\\'")}')">✕</button>`;
 
   // 시트 '그룹' 열 기반 그룹이 있는 건물
   const bGroups = buildingGroupRooms[bName];
@@ -1324,6 +1340,39 @@ function openFloorplanFullscreen(bName, fp) {
   const title = document.createElement('div'); title.className = 'fp-fullscreen-title';
   title.textContent = `${bName} — ${fp.groupName || ''}`;
   overlay.appendChild(title);
+
+  // 층(그룹) 탭 — 같은 건물에 저장된 평면도가 여럿이면 표시
+  const fpGroups = floorplans[bName] || {};
+  const groupsWithImg = Object.keys(fpGroups).filter(g => fpGroups[g]?.imgDataURL).sort((a,b) => GROUP_ORDER(a) - GROUP_ORDER(b));
+  let currentGroup = fp.groupName || groupsWithImg[0];
+  if (groupsWithImg.length > 1) {
+    const tabBar = document.createElement('div'); tabBar.className = 'fp-fullscreen-floors';
+    groupsWithImg.forEach(g => {
+      const b = document.createElement('button');
+      b.className = 'fp-fullscreen-floor-btn' + (g === currentGroup ? ' active' : '');
+      b.textContent = g;
+      b.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        if (g === currentGroup) return;
+        currentGroup = g;
+        tabBar.querySelectorAll('.fp-fullscreen-floor-btn').forEach(x => x.classList.toggle('active', x.textContent === g));
+        // 이미지 + 박스 재렌더
+        const newFp = fpGroups[g];
+        title.textContent = `${bName} — ${newFp.groupName || g}`;
+        img.src = newFp.imgDataURL;
+        // 기존 박스 제거
+        inner.querySelectorAll('.card-fp-box').forEach(el => el.remove());
+        // 줌 리셋
+        fpZoom = 1; fpPanX = 0; fpPanY = 0; applyFpTransform();
+        // 현재 fp 업데이트
+        fp = newFp;
+        if (img.complete) requestAnimationFrame(renderFSBoxes);
+        else img.onload = renderFSBoxes;
+      });
+      tabBar.appendChild(b);
+    });
+    overlay.appendChild(tabBar);
+  }
 
   // 줌 상태
   let fpZoom = 1, fpPanX = 0, fpPanY = 0;
@@ -1596,6 +1645,47 @@ const wrapper=document.getElementById('canvasWrapper');
 wrapper.addEventListener('mousedown',e=>{if(isDraggingCard||e.target.closest('.building-card'))return;isPanning=true;panStart={x:e.clientX-panOffset.x,y:e.clientY-panOffset.y};wrapper.classList.add('panning');});
 document.addEventListener('mousemove',e=>{if(!isPanning)return;panOffset.x=e.clientX-panStart.x;panOffset.y=e.clientY-panStart.y;applyTransform();});
 document.addEventListener('mouseup',()=>{isPanning=false;wrapper.classList.remove('panning');});
+
+// ── 터치: 전체지도 팬 + 핀치줌 ──
+let _touchPinchD=0,_touchPinchZ=1,_touchMode=null,_touchStartPan={x:0,y:0};
+wrapper.addEventListener('touchstart',e=>{
+  if(e.target.closest('.building-card'))return; // 카드 자체의 드래그 핸들이 처리
+  if(e.touches.length===1){
+    _touchMode='pan';
+    const t=e.touches[0];
+    panStart={x:t.clientX-panOffset.x,y:t.clientY-panOffset.y};
+    wrapper.classList.add('panning');
+  } else if(e.touches.length===2){
+    _touchMode='pinch';
+    const a=e.touches[0],b=e.touches[1];
+    _touchPinchD=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
+    _touchPinchZ=zoomScale;
+    _touchStartPan={x:panOffset.x,y:panOffset.y};
+  }
+},{passive:true});
+wrapper.addEventListener('touchmove',e=>{
+  if(!_touchMode||isDraggingCard)return;
+  if(_touchMode==='pan'&&e.touches.length===1){
+    e.preventDefault();
+    const t=e.touches[0];
+    panOffset.x=t.clientX-panStart.x;
+    panOffset.y=t.clientY-panStart.y;
+    applyTransform();
+  } else if(_touchMode==='pinch'&&e.touches.length===2){
+    e.preventDefault();
+    const a=e.touches[0],b=e.touches[1];
+    const d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
+    setZoom(_touchPinchZ*(d/_touchPinchD));
+  }
+},{passive:false});
+wrapper.addEventListener('touchend',e=>{
+  if(e.touches.length===0){_touchMode=null;wrapper.classList.remove('panning');}
+  else if(e.touches.length===1&&_touchMode==='pinch'){
+    _touchMode='pan';
+    const t=e.touches[0];
+    panStart={x:t.clientX-panOffset.x,y:t.clientY-panOffset.y};
+  }
+});
 wrapper.addEventListener('wheel',e=>{
   if(e.ctrlKey||e.metaKey){
     // Ctrl+휠: 확대/축소
@@ -1634,12 +1724,12 @@ document.getElementById('searchInput').addEventListener('input',e=>{searchQuery=
 // ── VACANT FILTER ──
 document.getElementById('vacantFilter').addEventListener('click',function(){vacantOnly=!vacantOnly;this.classList.toggle('on',vacantOnly);this.textContent=vacantOnly?'전체 보기':'공실만';refreshAllCards();});
 
-function refreshAllCards(){Object.keys(buildings).forEach((bn)=>{const cid='card_'+btoa(encodeURIComponent(bn)).replace(/[^a-zA-Z0-9]/g,'_');rebuildCard(cid,bn);});updateStats();}
+function refreshAllCards(){[...activeBuildings].filter(b=>buildings[b]).forEach((bn)=>{const cid='card_'+btoa(encodeURIComponent(bn)).replace(/[^a-zA-Z0-9]/g,'_');rebuildCard(cid,bn);});updateStats();}
 
-function updateStats(){const bn=Object.keys(buildings);document.getElementById('statBuildings').textContent=bn.length;let t=0,v=0;bn.forEach(b=>Object.values(buildings[b]).forEach(fl=>Object.values(fl).forEach(rs=>{t+=rs.length;v+=rs.filter(r=>isVacant(r)).length;})));document.getElementById('statRooms').textContent=t;document.getElementById('statVacant').textContent=v;}
+function updateStats(){const total=Object.keys(buildings).length;const active=[...activeBuildings].filter(b=>buildings[b]).length;document.getElementById('statBuildings').textContent=total>active?`${active}/${total}`:active;let t=0,v=0;[...activeBuildings].filter(b=>buildings[b]).forEach(b=>Object.values(buildings[b]).forEach(fl=>Object.values(fl).forEach(rs=>{t+=rs.length;v+=rs.filter(r=>isVacant(r)).length;})));document.getElementById('statRooms').textContent=t;document.getElementById('statVacant').textContent=v;}
 
 document.getElementById('saveLayout').addEventListener('click',savePositions);
-document.getElementById('resetLayout').addEventListener('click',()=>{if(!confirm('배치를 초기화할까요?'))return;localStorage.removeItem(STORAGE_KEY);positions={};Object.keys(buildings).forEach((bn,i)=>{const cid='card_'+btoa(encodeURIComponent(bn)).replace(/[^a-zA-Z0-9]/g,'_');positions[cid]=getDefaultPosition(i);const c=document.getElementById(cid);if(c){c.style.left=positions[cid].x+'px';c.style.top=positions[cid].y+'px';}});showToast('배치 초기화 완료');});
+document.getElementById('resetLayout').addEventListener('click',()=>{if(!confirm('배치를 초기화할까요? (지도에 추가된 건물 목록도 비워집니다)'))return;localStorage.removeItem(STORAGE_KEY);localStorage.removeItem(ACTIVE_KEY);positions={};activeBuildings=new Set();renderAllCards();showToast('배치 초기화 완료');});
 
 // ═══════════════════════════════════════════════
 // EDITOR — STATE
@@ -2707,6 +2797,13 @@ function edSaveToMap(){
       imgDataURL,
       savedAt: new Date().toISOString()
     };
+    // 평면도를 저장했다면 전체지도에도 자동 추가
+    if (!activeBuildings.has(bName)) {
+      activeBuildings.add(bName);
+      const cid='card_'+btoa(encodeURIComponent(bName)).replace(/[^a-zA-Z0-9]/g,'_');
+      if (!positions[cid]) positions[cid] = getDefaultPosition(activeBuildings.size - 1);
+      try { localStorage.setItem(ACTIVE_KEY, JSON.stringify([...activeBuildings])); } catch(e) {}
+    }
     try {
       localStorage.setItem(FLOORPLAN_KEY, JSON.stringify(floorplans));
       showToast(`✅ '${bName}/${gName}' 평면도 저장 완료`);
@@ -2815,10 +2912,49 @@ function edLoadLayout(input) {
 // ═══════════════════════════════════════════════
 // MAP BACKGROUND — OSM TILES
 // ═══════════════════════════════════════════════
+const MAPBG_KEY = 'wirye_mapbg_v1';
 let mapBgOn = false;
 let mapScale = 3.0;
 let mapShiftX = 0, mapShiftY = 0;
 let mapOpacity = 0.55;
+
+// 저장된 지도 배경 상태 복원
+try {
+  const _m = localStorage.getItem(MAPBG_KEY);
+  if (_m) {
+    const st = JSON.parse(_m);
+    if (typeof st.scale === 'number') mapScale = st.scale;
+    if (typeof st.shiftX === 'number') mapShiftX = st.shiftX;
+    if (typeof st.shiftY === 'number') mapShiftY = st.shiftY;
+    if (typeof st.opacity === 'number') mapOpacity = st.opacity;
+    if (st.on) mapBgOn = true; // applyMapBgFromState로 토글
+  }
+} catch(e) {}
+
+let _mapBgSaveTimer = null;
+function saveMapBgState() {
+  const st = { on: mapBgOn, scale: mapScale, shiftX: mapShiftX, shiftY: mapShiftY, opacity: mapOpacity };
+  try { localStorage.setItem(MAPBG_KEY, JSON.stringify(st)); } catch(e) {}
+  // 디바운스 클라우드 저장
+  clearTimeout(_mapBgSaveTimer);
+  _mapBgSaveTimer = setTimeout(() => { try { cloudSaveAll(); } catch(e) {} }, 1200);
+}
+
+// 초기화 시 호출 — 저장된 상태로 지도를 자동 복원
+function applyMapBgFromState() {
+  if (!mapBgOn) return;
+  const btn = document.getElementById('mapBgBtn');
+  if (btn) { btn.classList.add('on'); btn.textContent = '지도 숨김'; }
+  const canvas = document.getElementById('canvas');
+  const ctrl = document.getElementById('mapBgControls');
+  loadMapTiles();
+  if (canvas) canvas.classList.add('map-bg-on');
+  if (ctrl) ctrl.classList.add('visible');
+  const sl = document.getElementById('mapOpacitySlider');
+  if (sl) sl.value = Math.round(mapOpacity * 100);
+  const c = document.getElementById('mapTileContainer');
+  if (c) c.style.opacity = mapOpacity;
+}
 
 function toggleMapBg() {
   mapBgOn = !mapBgOn;
@@ -2837,6 +2973,7 @@ function toggleMapBg() {
     canvas.classList.remove('map-bg-on');
     ctrl.classList.remove('visible');
   }
+  saveMapBgState();
 }
 
 function adjustMapBg(action) {
@@ -2851,12 +2988,14 @@ function adjustMapBg(action) {
     case 'reset': mapScale = 3.0; mapShiftX = 0; mapShiftY = 0; break;
   }
   applyMapTransform();
+  saveMapBgState();
 }
 
 function adjustMapOpacity(val) {
   mapOpacity = parseInt(val) / 100;
   const c = document.getElementById('mapTileContainer');
   if (c) c.style.opacity = mapOpacity;
+  saveMapBgState();
 }
 
 function applyMapTransform() {
@@ -2980,13 +3119,20 @@ async function cloudSaveAll() {
     // 2) JSON 메타데이터 업로드
     const dataBlob = new Blob([JSON.stringify(dataOnly)], { type: 'application/json' });
     const posBlob = new Blob([JSON.stringify(positions)], { type: 'application/json' });
+    const activePayload = {
+      active: [...activeBuildings],
+      mapBg: { on: mapBgOn, scale: mapScale, shiftX: mapShiftX, shiftY: mapShiftY, opacity: mapOpacity }
+    };
+    const activeBlob = new Blob([JSON.stringify(activePayload)], { type: 'application/json' });
 
     await Promise.all([
       ...imgUploads,
       supabase.storage.from(SUPABASE_BUCKET)
         .upload('_data.json', dataBlob, { upsert: true, contentType: 'application/json' }),
       supabase.storage.from(SUPABASE_BUCKET)
-        .upload('_positions.json', posBlob, { upsert: true, contentType: 'application/json' })
+        .upload('_positions.json', posBlob, { upsert: true, contentType: 'application/json' }),
+      supabase.storage.from(SUPABASE_BUCKET)
+        .upload('_active.json', activeBlob, { upsert: true, contentType: 'application/json' })
     ]);
 
     updateSyncStatus('☁️ 저장 완료');
@@ -3031,6 +3177,29 @@ async function cloudLoadAll() {
       const cloudPos = JSON.parse(await posFile.text());
       if (Object.keys(cloudPos).length > 0) positions = cloudPos;
     }
+
+    // 2-1) _active.json 다운로드 (활성 건물 + 지도 배경 상태)
+    try {
+      const { data: activeFile } = await supabase.storage
+        .from(SUPABASE_BUCKET).download('_active.json');
+      if (activeFile) {
+        const payload = JSON.parse(await activeFile.text());
+        if (Array.isArray(payload.active)) {
+          activeBuildings = new Set(payload.active);
+          _activeMigrated = true;
+          try { localStorage.setItem(ACTIVE_KEY, JSON.stringify([...activeBuildings])); } catch(e) {}
+        }
+        if (payload.mapBg) {
+          const m = payload.mapBg;
+          if (typeof m.scale === 'number') mapScale = m.scale;
+          if (typeof m.shiftX === 'number') mapShiftX = m.shiftX;
+          if (typeof m.shiftY === 'number') mapShiftY = m.shiftY;
+          if (typeof m.opacity === 'number') mapOpacity = m.opacity;
+          if (m.on) { mapBgOn = true; /* 실제 토글은 init에서 처리 */ }
+          try { localStorage.setItem(MAPBG_KEY, JSON.stringify(m)); } catch(e) {}
+        }
+      }
+    } catch(e) { console.warn('_active.json load skipped:', e.message); }
 
     // 3) 각 이미지 다운로드 → base64로 로컬에 저장 (다른 기기에서도 동작)
     const downloads = [];
