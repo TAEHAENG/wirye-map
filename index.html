@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>위례 트램라인 상가지도</title>
 <meta name="description" content="위례 신도시 트램라인 상권 전체 상가 지도 - 건물별 층별 평면도 및 호실 정보">
+<meta name="theme-color" content="#2563eb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="상가맵">
+<link rel="icon" type="image/svg+xml" href="icons/상가맵.svg">
+<link rel="apple-touch-icon" href="icons/상가맵.svg">
+<link rel="manifest" href="icons/manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" async></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=IBM+Plex+Mono:wght@400;600&display=swap');
@@ -184,11 +191,14 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 .canvas.map-bg-on{background:none!important}
 
 /* Map bg controls */
-.map-bg-ctrl{display:none;position:absolute;bottom:16px;left:60px;z-index:100;background:var(--paper2);border:1.5px solid var(--line);border-radius:10px;padding:8px;box-shadow:var(--shadow);flex-direction:column;gap:5px;align-items:center}
+.map-bg-ctrl{display:none;position:absolute;bottom:16px;left:60px;z-index:100;background:var(--paper2);border:1.5px solid var(--line);border-radius:10px;padding:8px;box-shadow:var(--shadow);flex-direction:column;gap:5px;align-items:center;transition:opacity .2s}
 .map-bg-ctrl.visible{display:flex}
+.map-bg-ctrl.collapsed{padding:4px 8px;gap:0}
+.map-bg-ctrl.collapsed .map-bg-ctrl-row,.map-bg-ctrl.collapsed .map-bg-ctrl-title{display:none}
 .map-bg-ctrl-title{font-size:10px;font-weight:700;color:var(--text2);letter-spacing:.3px}
 .map-bg-ctrl-row{display:flex;gap:3px;align-items:center}
 .map-bg-ctrl-val{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text2);min-width:38px;text-align:center}
+.map-bg-ctrl-toggle{position:absolute;top:-10px;right:-10px;width:22px;height:22px;background:var(--blue);color:#fff;border:2px solid #fff;border-radius:50%;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.2);z-index:5;font-weight:700;line-height:1;padding:0}
 .ed-hint{font-size:11px;color:var(--text2);line-height:1.5;padding:8px 10px;background:var(--blue-light);border-radius:6px;border-left:3px solid var(--blue)}
 .placed-pill{font-family:'IBM Plex Mono',monospace;font-size:11px;background:var(--blue-light);color:var(--blue);padding:2px 8px;border-radius:8px;font-weight:700}
 
@@ -226,12 +236,14 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
   .fp-fullscreen-zoom{bottom:16px;right:50%;transform:translateX(50%);flex-direction:row}
   .fp-fullscreen-zoom .zoom-val{border-top:none;border-bottom:none;border-left:1px solid rgba(255,255,255,.15);border-right:1px solid rgba(255,255,255,.15);padding:0 8px;display:flex;align-items:center}
   .fp-fullscreen-hint{display:none}
-  .fp-fullscreen-overlay.with-panel{right:0;bottom:50%}
+  /* 모바일: 패널이 열려도 평면도 뷰포트/이미지 크기 유지 (패널은 하단 플로팅) */
+  .fp-fullscreen-overlay.with-panel{right:0;bottom:0}
+  .fp-fullscreen-overlay.with-panel .fp-fullscreen-inner img{max-width:95vw;max-height:88vh}
 }
 /* 상세 패널이 풀스크린 위에 항상 노출되도록 */
 body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;bottom:0;z-index:9500!important;width:300px;background:var(--paper2);border-left:1.5px solid var(--line)}
 @media(max-width:640px){
-  body > .detail-panel.fp-fullscreen-mode{width:100%;top:auto;bottom:0;height:50vh;border-left:none;border-top:1.5px solid var(--line)}
+  body > .detail-panel.fp-fullscreen-mode{width:100%;top:auto;bottom:0;height:45vh;max-height:45vh;border-left:none;border-top:1.5px solid var(--line);box-shadow:0 -4px 20px rgba(0,0,0,.35)}
 }
 
 /* 건물 추가 팝오버 */
@@ -243,8 +255,22 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
 .building-card:hover .card-remove-btn{opacity:1}
 .card-remove-btn:hover{background:#fee2e2;color:#dc2626}
 
+/* 이미지 편집 메뉴 (통합 팝오버) */
+.ed-img-menu{position:absolute;top:100%;left:0;right:0;margin-top:4px;background:var(--paper2);border:1.5px solid var(--line);border-radius:10px;box-shadow:var(--shadow-lg);padding:6px;display:flex;flex-direction:column;gap:3px;z-index:300;min-width:180px}
+.ed-img-menu button,.ed-img-menu label{text-align:left;padding:8px 10px;border-radius:6px;background:transparent;border:none;font-size:12px;font-weight:600;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:8px;font-family:inherit;transition:background .12s}
+.ed-img-menu button:hover,.ed-img-menu label:hover{background:#eff6ff;color:var(--blue)}
+.ed-img-menu-sep{height:1px;background:var(--line);margin:3px 0}
+
+/* 방향 라벨 — 평면도 가장자리에 표시되는 설명 */
+.ed-dir-label{position:absolute;background:rgba(255,255,255,.92);border:1.5px solid var(--blue-mid);color:var(--ink);font-weight:700;font-size:12px;padding:3px 10px;border-radius:6px;box-shadow:0 2px 6px rgba(0,0,0,.15);white-space:nowrap;pointer-events:none;z-index:40}
+.ed-dir-label.top{top:6px;left:50%;transform:translateX(-50%)}
+.ed-dir-label.bottom{bottom:6px;left:50%;transform:translateX(-50%)}
+.ed-dir-label.left{left:6px;top:50%;transform:translateY(-50%) rotate(-90deg);transform-origin:center}
+.ed-dir-label.right{right:6px;top:50%;transform:translateY(-50%) rotate(90deg);transform-origin:center}
+.fp-fullscreen-inner .ed-dir-label,.card-fp-box ~ .ed-dir-label{pointer-events:none}
+
 /* 레이어 합성 모드 */
-.compose-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:8000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;touch-action:none}
+.compose-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:8000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px;touch-action:none}
 .compose-stage{position:relative;background:#f3f4f6;border:2px solid #fff;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.4);background-image:linear-gradient(45deg,#e5e7eb 25%,transparent 25%),linear-gradient(-45deg,#e5e7eb 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e5e7eb 75%),linear-gradient(-45deg,transparent 75%,#e5e7eb 75%);background-size:20px 20px;background-position:0 0,0 10px,10px -10px,10px 0}
 .compose-layer{position:absolute;cursor:move;user-select:none;box-sizing:border-box}
 .compose-layer img{display:block;width:100%;height:100%;pointer-events:none;-webkit-user-drag:none}
@@ -288,10 +314,22 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
 .card-fp-container{position:relative;width:100%;border-radius:6px;border:1px solid var(--line);overflow:visible;background:#f8f9fe;cursor:pointer}
 .card-fp-container img{width:100%;display:block;image-rendering:auto}
 .card-fp-box{position:absolute;background:transparent;border:none;border-radius:0;overflow:hidden;pointer-events:auto;display:flex;align-items:center;cursor:pointer}
-.card-fp-box .fp-name{font-weight:700;color:#1a1c2a;text-align:left;line-height:1.2;white-space:nowrap;padding:2px 4px;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 6px #fff;pointer-events:none;width:100%;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis}
-.card-fp-box .fp-name.fp-color-vacant{color:#2563eb}
-.card-fp-box .fp-name.fp-color-suggest{color:#e84393}
+.card-fp-box .fp-name{font-weight:800;color:#1a1c2a;text-align:left;line-height:1.2;white-space:nowrap;padding:2px 4px;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 6px #fff;pointer-events:none;width:100%;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis}
+.card-fp-box .fp-name.fp-color-vacant{color:#00a8ff;text-shadow:0 0 2px #fff,0 0 4px #fff,0 0 10px #7dd3fc,0 0 14px #38bdf8;font-weight:900;letter-spacing:-0.2px}
+.card-fp-box .fp-name.fp-color-suggest{color:#ff2d95;text-shadow:0 0 2px #fff,0 0 4px #fff,0 0 10px #fbcfe8,0 0 14px #f472b6;font-weight:900;letter-spacing:-0.2px}
 .card-fp-box .fp-name.fp-color-default{color:#1a1c2a}
+/* 풀스크린에서도 동일 컬러 강화 */
+.fp-fullscreen-inner .fp-name.fp-color-vacant{color:#00a8ff;text-shadow:0 0 3px #fff,0 0 6px #fff,0 0 12px #7dd3fc,0 0 18px #38bdf8;font-weight:900}
+.fp-fullscreen-inner .fp-name.fp-color-suggest{color:#ff2d95;text-shadow:0 0 3px #fff,0 0 6px #fff,0 0 12px #fbcfe8,0 0 18px #f472b6;font-weight:900}
+/* 반짝임 애니메이션 */
+@keyframes fpSparkle {
+  0%,100%{filter:brightness(1) saturate(1.1)}
+  50%{filter:brightness(1.25) saturate(1.35)}
+}
+.card-fp-box .fp-name.fp-color-vacant,
+.card-fp-box .fp-name.fp-color-suggest,
+.fp-fullscreen-inner .fp-name.fp-color-vacant,
+.fp-fullscreen-inner .fp-name.fp-color-suggest{animation:fpSparkle 2.6s ease-in-out infinite}
 
 /* Editor Canvas */
 .ed-canvas-area{flex:1;overflow:auto;background:#e8eaf0;background-image:radial-gradient(circle,#c8cde0 1px,transparent 1px);background-size:20px 20px;position:relative}
@@ -371,15 +409,70 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
 @keyframes spin{to{transform:rotate(360deg)}}
 .loading-text{font-size:14px;color:var(--text2);font-weight:500}
 
+/* Login */
+.login-overlay{position:fixed;inset:0;background:linear-gradient(135deg,#3b82f6 0%,#1e3a8a 100%);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;transition:opacity .3s}
+.login-card{background:#fff;border-radius:18px;padding:34px 30px 28px;box-shadow:0 24px 60px rgba(0,0,0,.32);width:100%;max-width:360px}
+.login-head{display:flex;align-items:center;gap:12px;margin-bottom:22px;justify-content:center}
+.login-logo-icon{width:56px;height:56px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;font-weight:900;font-size:34px;border-radius:14px;display:flex;align-items:center;justify-content:center;letter-spacing:-2px;box-shadow:0 6px 18px rgba(37,99,235,.4)}
+.login-title{font-weight:900;font-size:22px;color:var(--ink);letter-spacing:-.5px;line-height:1.1}
+.login-subtitle{font-size:12px;color:var(--text2);margin-top:3px}
+.login-form{display:flex;flex-direction:column;gap:10px}
+.login-form-label{font-size:11px;color:var(--text2);font-weight:700;letter-spacing:.5px;margin-bottom:-4px}
+.login-input{width:100%;height:46px;padding:0 14px;border:1.5px solid var(--line);border-radius:10px;font-size:18px;font-family:inherit;letter-spacing:6px;text-align:center;font-weight:700;transition:border-color .15s,box-shadow .15s}
+.login-input:focus{border-color:var(--blue);outline:none;box-shadow:0 0 0 3px rgba(37,99,235,.15)}
+.login-check-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-size:12px;padding:4px 2px 2px}
+.login-check-row label{display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text2);font-weight:500}
+.login-check-row input[type=checkbox]{width:14px;height:14px;accent-color:var(--blue);cursor:pointer}
+.login-error{font-size:11px;color:var(--red);min-height:14px;text-align:center;font-weight:600}
+.login-btn{height:46px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;letter-spacing:.5px;transition:background .12s,transform .06s}
+.login-btn:hover{background:#1d4ed8}
+.login-btn:active{transform:scale(.98)}
+@media(max-width:640px){
+  .login-card{padding:28px 22px 22px;border-radius:14px}
+  .login-title{font-size:20px}
+  .login-logo-icon{width:50px;height:50px;font-size:30px}
+}
+
 @media(max-width:640px){
   .topbar-search{display:none}
   .detail-panel{width:100%}
-  .building-card{width:280px;max-width:95vw}
+  /* 사용자가 지정한 카드 폭을 존중 — max-width 제거 (캔버스 팬으로 탐색) */
+  .building-card{min-width:260px}
   .editor-sidebar{width:100%;min-width:auto}
+  /* 모바일 토픽바 버튼 크기 축소 */
+  .topbar{padding:0 8px;gap:6px}
+  .topbar-logo{font-size:12px}
+  .topbar-logo svg{width:14px;height:14px}
+  .main-tab{padding:4px 10px;font-size:11px}
+  .topbar-actions .btn,.topbar-actions .filter-toggle{height:28px;padding:0 8px;font-size:10px}
+  .topbar-actions #syncStatus{display:none}
 }
 </style>
 </head>
 <body>
+
+<!-- LOGIN -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <div class="login-head">
+      <div class="login-logo-icon">상</div>
+      <div>
+        <div class="login-title">상가맵</div>
+        <div class="login-subtitle">위례 트램라인 상가지도</div>
+      </div>
+    </div>
+    <form class="login-form" id="loginForm" onsubmit="doLogin(event)">
+      <div class="login-form-label">암호</div>
+      <input type="password" id="loginPw" class="login-input" inputmode="numeric" pattern="[0-9]*" autocomplete="current-password" maxlength="8" placeholder="••••">
+      <div class="login-check-row">
+        <label><input type="checkbox" id="loginAutoLogin"> 자동 로그인</label>
+        <label><input type="checkbox" id="loginSavePw"> 암호 저장</label>
+      </div>
+      <div class="login-error" id="loginError"></div>
+      <button type="submit" class="login-btn">로그인</button>
+    </form>
+  </div>
+</div>
 
 <!-- LOADING -->
 <div class="loading-overlay" id="loadingOverlay">
@@ -442,6 +535,7 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
       </div>
       <!-- 지도 배경 조절 패널 -->
       <div class="map-bg-ctrl" id="mapBgControls">
+        <button class="map-bg-ctrl-toggle" id="mapBgCtrlToggle" onclick="toggleMapBgCtrlCollapse()" title="조절 패널 접기/펼치기">−</button>
         <div class="map-bg-ctrl-title">지도 배경</div>
         <div class="map-bg-ctrl-row">
           <button class="zoom-btn" onclick="adjustMapBg('zoomOut')" title="지도 축소">−</button>
@@ -486,16 +580,20 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
         <div class="building-selector">
           <select id="edBuildingSelect" style="height:28px;font-size:11px"><option value="">-- 건물 선택 --</option></select>
           <button class="btn primary" onclick="edLoadBuilding()" style="height:28px;font-size:11px;padding:0 10px">불러오기</button>
-          <div class="img-btn-row">
-            <label class="btn" style="cursor:pointer;height:30px;font-size:11px;padding:0 6px" title="평면도 이미지 업로드">
-              📁 이미지
-              <input type="file" id="edImgInput" accept="image/*" style="display:none" onchange="edHandleImage(this)">
-            </label>
-            <label class="btn" style="cursor:pointer;height:30px;font-size:11px;padding:0 6px;background:#eef2ff;border-color:#c7d2fe" title="여러 이미지를 올려 하나의 평면도로 합치기 (A동+B동 등)">
-              🧩 합성
-              <input type="file" id="edComposeInput" accept="image/*" multiple style="display:none" onchange="edStartCompose(this)">
-            </label>
-            <button class="btn" onclick="edStartCrop()" style="height:30px;font-size:11px;padding:0 6px;background:#fef3c7;border-color:#fde68a" title="평면도 외곽을 선택해서 잘라내고 흰 여백을 추가합니다">✂️ 크롭+여백</button>
+          <div class="img-btn-row" style="position:relative">
+            <button class="btn" id="edImgMenuBtn" onclick="toggleEdImgMenu(event)" style="height:30px;font-size:11px;padding:0 10px;background:#eff6ff;border-color:#c7d2fe;flex:1" title="이미지 업로드/합성/크롭/여백/회전">🛠 이미지 편집 ▾</button>
+            <div class="ed-img-menu" id="edImgMenu" style="display:none" onclick="event.stopPropagation()">
+              <label for="edImgInput">📁 이미지 업로드</label>
+              <input type="file" id="edImgInput" accept="image/*" style="display:none" onchange="edHandleImage(this);closeEdImgMenu()">
+              <label for="edComposeInput">🧩 여러 이미지 합성</label>
+              <input type="file" id="edComposeInput" accept="image/*" multiple style="display:none" onchange="edStartCompose(this);closeEdImgMenu()">
+              <div class="ed-img-menu-sep"></div>
+              <button onclick="closeEdImgMenu();edStartCrop('crop')">✂️ 크롭</button>
+              <button onclick="closeEdImgMenu();edStartCrop('pad')">📐 여백 추가</button>
+              <div class="ed-img-menu-sep"></div>
+              <button onclick="closeEdImgMenu();edRotateImage('ccw')">↺ 90° 반시계</button>
+              <button onclick="closeEdImgMenu();edRotateImage('cw')">↻ 90° 시계</button>
+            </div>
           </div>
         </div>
         <span id="edImgName" style="font-size:10px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
@@ -557,6 +655,28 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
             <span style="font-size:10px;color:var(--text3)">°</span>
             <span style="font-size:9px;color:var(--text3);margin-left:4px">회전 손잡이 또는 직접 입력</span>
           </div>
+          <!-- 기준점 복사/붙여넣기 -->
+          <div class="ed-place-cfg-row" style="gap:4px">
+            <span class="ed-place-cfg-label">기준점</span>
+            <button class="btn" onclick="edCopyAxis()" style="font-size:10px;padding:0 8px;height:24px" title="현재 X/Y축·각도 설정을 저장">📋 복사</button>
+            <button class="btn" id="edPasteAxisBtn" onclick="edPasteAxis()" style="font-size:10px;padding:0 8px;height:24px" title="저장된 기준점으로 복원" disabled>📥 붙여넣기</button>
+            <span id="edAxisSavedLabel" style="font-size:9px;color:var(--text3)"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 방향 설명 라벨 -->
+      <div class="ed-place-cfg" id="edDirLabelsCfg">
+        <div style="font-size:10px;color:var(--text2);padding:2px 2px 4px;font-weight:600">방향 설명 (상/하/좌/우)</div>
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:4px;align-items:center;font-size:10px">
+          <span style="color:var(--text2);font-weight:600">↑ 상</span>
+          <input type="text" id="edDirTop" maxlength="12" placeholder="예: 도로" style="height:24px;font-size:11px;border:1.5px solid var(--line);border-radius:5px;padding:0 6px;font-family:inherit" oninput="edApplyDirLabels()">
+          <span style="color:var(--text2);font-weight:600">↓ 하</span>
+          <input type="text" id="edDirBottom" maxlength="12" placeholder="예: 하천" style="height:24px;font-size:11px;border:1.5px solid var(--line);border-radius:5px;padding:0 6px;font-family:inherit" oninput="edApplyDirLabels()">
+          <span style="color:var(--text2);font-weight:600">← 좌</span>
+          <input type="text" id="edDirLeft" maxlength="12" placeholder="예: 광장" style="height:24px;font-size:11px;border:1.5px solid var(--line);border-radius:5px;padding:0 6px;font-family:inherit" oninput="edApplyDirLabels()">
+          <span style="color:var(--text2);font-weight:600">→ 우</span>
+          <input type="text" id="edDirRight" maxlength="12" placeholder="예: 주차장" style="height:24px;font-size:11px;border:1.5px solid var(--line);border-radius:5px;padding:0 6px;font-family:inherit" oninput="edApplyDirLabels()">
         </div>
       </div>
 
@@ -610,6 +730,48 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
 
 <!-- 여기서부터 JS (다음 스텝에서 추가) -->
 <script>
+
+// ═══════════════════════════════════════════════
+// LOGIN GATE
+// ═══════════════════════════════════════════════
+const LOGIN_KEY = 'wirye_login_v1';
+const LOGIN_PW  = '4600';
+(function initLogin(){
+  let st = {};
+  try { st = JSON.parse(localStorage.getItem(LOGIN_KEY) || '{}'); } catch(e){}
+  const ov = document.getElementById('loginOverlay');
+  if (!ov) return;
+  if (st.autoLogin) { ov.remove(); return; }
+  const pwInput = document.getElementById('loginPw');
+  const autoCk  = document.getElementById('loginAutoLogin');
+  const saveCk  = document.getElementById('loginSavePw');
+  if (st.savedPw && pwInput) { pwInput.value = st.savedPw; if(saveCk) saveCk.checked = true; }
+  if (st.autoLoginPreferred && autoCk) autoCk.checked = true;
+  setTimeout(()=>pwInput?.focus(), 60);
+})();
+function doLogin(ev){
+  ev.preventDefault();
+  const pwInput = document.getElementById('loginPw');
+  const err     = document.getElementById('loginError');
+  const autoCk  = document.getElementById('loginAutoLogin');
+  const saveCk  = document.getElementById('loginSavePw');
+  const pw = (pwInput?.value || '').trim();
+  if (pw !== LOGIN_PW) {
+    err.textContent = '암호가 올바르지 않습니다';
+    pwInput.value = '';
+    pwInput.focus();
+    return;
+  }
+  const st = {};
+  if (autoCk?.checked) { st.autoLogin = true; st.autoLoginPreferred = true; }
+  if (saveCk?.checked) st.savedPw = pw;
+  try { localStorage.setItem(LOGIN_KEY, JSON.stringify(st)); } catch(e){}
+  const ov = document.getElementById('loginOverlay');
+  if (ov) {
+    ov.style.opacity = '0';
+    setTimeout(()=>ov.remove(), 300);
+  }
+}
 
 // ═══════════════════════════════════════════════
 // COMMON STATE & CONFIG
@@ -1271,8 +1433,8 @@ function buildFloorplanView(bName, fp) {
     }
     const cW = container.offsetWidth || 300;
     const scale = cW / natW;
-    // 편집기와 동일한 비율의 텍스트 크기 (편집기 obox-name: 11px 기준, 1.5배 보정)
-    const baseFontPx = 16.5; // 11px * 1.5
+    // 편집기와 동일한 비율의 텍스트 크기 (편집기 obox-name: 11px 기준)
+    const baseFontPx = 11;
     // 건물명 컬럼 자동 탐색
     const bCol = sheetHeaders.find(h => h === '건물명' || h === '상가명') || '';
     const dongCol = sheetHeaders.find(h => h === '동') || '';
@@ -1307,6 +1469,18 @@ function buildFloorplanView(bName, fp) {
       });
       container.appendChild(box);
     }
+    // 방향 라벨 (상/하/좌/우)
+    container.querySelectorAll('.ed-dir-label').forEach(el => el.remove());
+    const dl = fp.dirLabels || {};
+    ['top','bottom','left','right'].forEach(s => {
+      const txt = (dl[s] || '').trim();
+      if (!txt) return;
+      const el = document.createElement('div');
+      el.className = 'ed-dir-label ' + s;
+      el.style.fontSize = Math.max(9, Math.round(10 * scale)) + 'px';
+      el.textContent = txt;
+      container.appendChild(el);
+    });
   };
   img.onload = renderBoxes;
   // 폴백: 이미 캐싱된 이미지
@@ -1540,7 +1714,7 @@ function openFloorplanFullscreen(bName, fp) {
     const dispW = img.offsetWidth || img.naturalWidth;
     const natW = img.naturalWidth || 1;
     const scale = dispW / natW;
-    const baseFontPx = 16.5;
+    const baseFontPx = 11;
     for (const [key, b] of Object.entries(fp.boxes)) {
       const box = document.createElement('div'); box.className='card-fp-box';
       box.style.left=b.x+'%'; box.style.top=b.y+'%'; box.style.width=b.w+'%'; box.style.height=b.h+'%';
@@ -1567,6 +1741,18 @@ function openFloorplanFullscreen(bName, fp) {
       });
       inner.appendChild(box);
     }
+    // 방향 라벨 (상/하/좌/우) — 풀스크린
+    inner.querySelectorAll('.ed-dir-label').forEach(el => el.remove());
+    const dl = fp.dirLabels || {};
+    ['top','bottom','left','right'].forEach(s => {
+      const txt = (dl[s] || '').trim();
+      if (!txt) return;
+      const el = document.createElement('div');
+      el.className = 'ed-dir-label ' + s;
+      el.style.fontSize = Math.max(12, Math.round(14 * scale)) + 'px';
+      el.textContent = txt;
+      inner.appendChild(el);
+    });
   };
   if (img.complete) requestAnimationFrame(renderFSBoxes);
   else img.onload = renderFSBoxes;
@@ -1756,6 +1942,9 @@ let edAxisYAnchor = 'top';    // 'top' | 'bottom'
 let edBoxModeRot = 0;         // 설정 모드 각도 (첫 박스 기준)
 let edBoxModeRotSet = false;  // 각도가 설정되었는지
 let edTextAlign = 'left';    // 텍스트 정렬: 'left' | 'center' | 'right'
+let edTextAlignManual = false; // 사용자가 텍스트 정렬을 직접 지정했는지
+// 저장된 축 기준점 — 다른 호실에서 복사해서 재사용 가능
+let edSavedAxis = null; // { xOn, xPos, xAnchor, yOn, yPos, yAnchor, rot }
 
 // 그룹명(층명) 상태
 let edGroupNameVal = '';
@@ -1773,8 +1962,12 @@ function edToggleBoxMode() {
     edAxisXOn = false; edAxisYOn = false;
     edBoxModeRotSet = false; edBoxModeRot = 0;
     edTextAlign = 'left';
+    edTextAlignManual = false;
     edSetTextAlign('left');
     edUpdateAxisUI();
+  } else {
+    // ON 시 수동 플래그 리셋
+    edTextAlignManual = false;
   }
   edUpdateAlignGuide();
   showToast(edBoxMode ? '⚙️ 상자 설정 모드 ON — 이후 배치되는 박스에 적용' : '상자 설정 모드 OFF');
@@ -1794,17 +1987,65 @@ function edSetAnchor(axis, anchor) {
   if (axis === 'x') {
     document.getElementById('edAnchorXLeft').classList.toggle('active', anchor==='left');
     document.getElementById('edAnchorXRight').classList.toggle('active', anchor==='right');
+    // X축 anchor에 따라 텍스트 정렬 자동 설정 (사용자가 수동으로 지정하지 않은 경우)
+    if (!edTextAlignManual) {
+      const auto = anchor === 'left' ? 'right' : 'left';
+      edTextAlign = auto;
+      edApplyTextAlignUI(auto);
+    }
   } else {
     document.getElementById('edAnchorYTop').classList.toggle('active', anchor==='top');
     document.getElementById('edAnchorYBottom').classList.toggle('active', anchor==='bottom');
   }
+  edUpdateAlignGuide();
 }
 
-function edSetTextAlign(align) {
-  edTextAlign = align;
+function edApplyTextAlignUI(align) {
   document.getElementById('edTextAlignLeft').classList.toggle('active', align==='left');
   document.getElementById('edTextAlignCenter').classList.toggle('active', align==='center');
   document.getElementById('edTextAlignRight').classList.toggle('active', align==='right');
+}
+
+function edSetTextAlign(align) {
+  edTextAlignManual = true;
+  edTextAlign = align;
+  edApplyTextAlignUI(align);
+}
+
+// ── 축 기준점 복사/붙여넣기 ──
+function edCopyAxis() {
+  edSavedAxis = {
+    xOn: edAxisXOn, xPos: edAxisXPos, xAnchor: edAxisXAnchor,
+    yOn: edAxisYOn, yPos: edAxisYPos, yAnchor: edAxisYAnchor,
+    rot: edBoxModeRotSet ? edBoxModeRot : 0,
+    rotSet: edBoxModeRotSet,
+    textAlign: edTextAlign,
+    textAlignManual: edTextAlignManual
+  };
+  const btn = document.getElementById('edPasteAxisBtn');
+  if (btn) btn.disabled = false;
+  const lbl = document.getElementById('edAxisSavedLabel');
+  if (lbl) lbl.textContent = '저장됨';
+  showToast('📋 기준점 저장 완료 — 다른 호실에서 붙여넣기로 재사용');
+}
+function edPasteAxis() {
+  if (!edSavedAxis) { showToast('저장된 기준점이 없습니다'); return; }
+  const s = edSavedAxis;
+  edAxisXOn = s.xOn; edAxisXPos = s.xPos; edAxisXAnchor = s.xAnchor;
+  edAxisYOn = s.yOn; edAxisYPos = s.yPos; edAxisYAnchor = s.yAnchor;
+  edBoxModeRot = s.rot; edBoxModeRotSet = s.rotSet;
+  edTextAlign = s.textAlign; edTextAlignManual = s.textAlignManual;
+  // UI 동기화
+  document.getElementById('edAnchorXLeft').classList.toggle('active', edAxisXAnchor==='left');
+  document.getElementById('edAnchorXRight').classList.toggle('active', edAxisXAnchor==='right');
+  document.getElementById('edAnchorYTop').classList.toggle('active', edAxisYAnchor==='top');
+  document.getElementById('edAnchorYBottom').classList.toggle('active', edAxisYAnchor==='bottom');
+  edApplyTextAlignUI(edTextAlign);
+  const angleInp = document.getElementById('edBoxModeAngleInput');
+  if (angleInp) angleInp.value = edBoxModeRot;
+  edUpdateAxisUI();
+  edUpdateAlignGuide();
+  showToast('📥 기준점 붙여넣기 완료');
 }
 
 function edUpdateAxisUI() {
@@ -1889,10 +2130,10 @@ function edApplyGroupName() { edApplyGroup(); }
 function edUpdateAlignGuide() {
   const wr = document.getElementById('edCanvasWrapper');
   if (!wr) return;
-  // X축 (세로선)
-  edCreateOrUpdateGuideX(wr, 'edAlignGuideX', edBoxMode && edAxisXOn, edAxisXPos, edAxisXAnchor === 'left' ? '← L' : 'R →');
-  // Y축 (가로선)
-  edCreateOrUpdateGuideY(wr, 'edAlignGuideY', edBoxMode && edAxisYOn, edAxisYPos, edAxisYAnchor === 'top' ? '↑ T' : 'B ↓');
+  // X축 (세로선) — 이름표 "X1" + 방향
+  edCreateOrUpdateGuideX(wr, 'edAlignGuideX', edBoxMode && edAxisXOn, edAxisXPos, 'X1 ' + (edAxisXAnchor === 'left' ? '← L' : 'R →'));
+  // Y축 (가로선) — 이름표 "Y1" + 방향
+  edCreateOrUpdateGuideY(wr, 'edAlignGuideY', edBoxMode && edAxisYOn, edAxisYPos, 'Y1 ' + (edAxisYAnchor === 'top' ? '↑ T' : 'B ↓'));
 }
 
 function edCreateOrUpdateGuideX(wr, guideId, isOn, xPos, labelText) {
@@ -2079,11 +2320,19 @@ function edLoadGroup(bName, gName) {
     img.src = saved.imgDataURL;
     img.onload = () => {
       edImgNW = img.naturalWidth; edImgNH = img.naturalHeight;
-      edApplyZoom(); edRenderAllBoxes(); edUpdateAlignGuide();
+      edApplyZoom(); edRenderAllBoxes(); edUpdateAlignGuide(); edApplyDirLabels();
     };
     document.getElementById('edCanvasWrapper').removeEventListener('click', edOnCanvasClick);
     document.getElementById('edCanvasWrapper').addEventListener('click', edOnCanvasClick);
   }
+
+  // 방향 라벨 복원
+  edDirLabels = Object.assign({ top:'', bottom:'', left:'', right:'' }, saved.dirLabels || {});
+  ['top','bottom','left','right'].forEach(s => {
+    const el = document.getElementById('edDir' + s.charAt(0).toUpperCase() + s.slice(1));
+    if (el) el.value = edDirLabels[s] || '';
+  });
+  edApplyDirLabels();
 
   edActiveDong = '전체';
   edRenderGroupTabs(bName);
@@ -2405,15 +2654,26 @@ function edAdjustCropPad(side, delta) {
   });
 }
 
-function edStartCrop() {
+// 편집 모드 — 'crop' (자르기만) / 'pad' (여백만) / 'both' (기존 방식)
+let edCropMode = 'both';
+function edStartCrop(mode) {
   if (!edImageURL) { showToast('먼저 평면도 이미지를 업로드하세요'); return; }
+  edCropMode = mode || 'both';
   const wrap = document.getElementById('edCanvasWrapper');
   if (wrap.querySelector('.crop-overlay')) return;
 
+  // 모드별 초기값 세팅
+  if (edCropMode === 'crop') {
+    edCropPad = { top:0, bottom:0, left:0, right:0 };
+  } else if (edCropMode === 'pad') {
+    edCropPad = { top:100, bottom:100, left:100, right:100 };
+  }
+
   const overlay = document.createElement('div'); overlay.className = 'crop-overlay';
 
-  // 초기 크롭 박스: 이미지의 80% 중앙
-  const cx = 10, cy = 10, cw = 80, ch = 80;
+  // 초기 크롭 박스: 이미지의 80% 중앙 (pad 모드는 전체 = 100%)
+  let cx = 10, cy = 10, cw = 80, ch = 80;
+  if (edCropMode === 'pad') { cx = 0; cy = 0; cw = 100; ch = 100; }
   const box = document.createElement('div'); box.className = 'crop-box';
   box.style.left = cx + '%'; box.style.top = cy + '%';
   box.style.width = cw + '%'; box.style.height = ch + '%';
@@ -2430,7 +2690,7 @@ function edStartCrop() {
       <span class="crop-pad-val" id="edCropPadVal_${side}">${edCropPad[side]}</span>
       <button class="crop-pad-btn" onclick="edAdjustCropPad('${side}',20)">+</button>
     </div>`;
-  toolbar.innerHTML = `
+  const padControls = (edCropMode === 'crop') ? '' : `
     ${padGroup('top', '↑', '상')}
     ${padGroup('bottom', '↓', '하')}
     ${padGroup('left', '←', '좌')}
@@ -2438,8 +2698,10 @@ function edStartCrop() {
     <div class="crop-pad-group" style="border-right:none">
       <button class="crop-pad-all" onclick="edAdjustCropPad('all',-20)" title="모두 -20">전체−</button>
       <button class="crop-pad-all" onclick="edAdjustCropPad('all',20)" title="모두 +20">전체+</button>
-    </div>
-    <button class="crop-ok" onclick="edApplyCrop()">✓ 잘라내기+여백</button>
+    </div>`;
+  const okLabel = edCropMode === 'crop' ? '✓ 잘라내기' : (edCropMode === 'pad' ? '✓ 여백 추가' : '✓ 잘라내기+여백');
+  toolbar.innerHTML = `${padControls}
+    <button class="crop-ok" onclick="edApplyCrop()">${okLabel}</button>
     <button class="crop-cancel" onclick="edCancelCrop()">취소</button>
   `;
 
@@ -2558,7 +2820,107 @@ function edApplyCrop() {
   };
 
   edCancelCrop();
-  showToast(`✂️ 크롭 완료 — ${outW}×${outH}px (여백 ↑${padT} ↓${padB} ←${padL} →${padR})`);
+  const msg = edCropMode === 'pad'
+    ? `📐 여백 추가 — ${outW}×${outH}px (↑${padT} ↓${padB} ←${padL} →${padR})`
+    : edCropMode === 'crop'
+      ? `✂️ 크롭 — ${outW}×${outH}px`
+      : `✂️ 크롭+여백 — ${outW}×${outH}px (↑${padT} ↓${padB} ←${padL} →${padR})`;
+  showToast(msg);
+}
+
+// ── 이미지 편집 메뉴 토글 ──
+function toggleEdImgMenu(ev) {
+  if (ev) ev.stopPropagation();
+  const menu = document.getElementById('edImgMenu');
+  if (!menu) return;
+  const open = menu.style.display !== 'none';
+  if (open) { closeEdImgMenu(); return; }
+  menu.style.display = 'flex';
+  setTimeout(() => { document.addEventListener('click', closeEdImgMenu, { once: true }); }, 0);
+}
+function closeEdImgMenu() {
+  const menu = document.getElementById('edImgMenu');
+  if (menu) menu.style.display = 'none';
+}
+
+// ── 이미지 회전 (90° CW/CCW) ──
+function edRotateImage(dir) {
+  if (!edImageURL) { showToast('먼저 평면도 이미지를 업로드하세요'); return; }
+  const img = document.getElementById('ed-floorplan-img');
+  const srcW = img.naturalWidth, srcH = img.naturalHeight;
+  if (!srcW || !srcH) { showToast('이미지 준비 중입니다'); return; }
+
+  const cvs = document.createElement('canvas');
+  cvs.width = srcH; cvs.height = srcW;
+  const ctx = cvs.getContext('2d');
+  if (dir === 'cw') {
+    ctx.translate(srcH, 0);
+    ctx.rotate(Math.PI / 2);
+  } else {
+    ctx.translate(0, srcW);
+    ctx.rotate(-Math.PI / 2);
+  }
+  ctx.drawImage(img, 0, 0);
+
+  // 박스 좌표 변환
+  for (const k of Object.keys(edBoxes)) {
+    const b = edBoxes[k];
+    const x = b.x, y = b.y, w = b.w, h = b.h;
+    if (dir === 'cw') {
+      b.x = 100 - (y + h);
+      b.y = x;
+      b.w = h;
+      b.h = w;
+      b.rot = (((b.rot || 0) + 90) % 360 + 360) % 360;
+    } else {
+      b.x = y;
+      b.y = 100 - (x + w);
+      b.w = h;
+      b.h = w;
+      b.rot = (((b.rot || 0) - 90) % 360 + 360) % 360;
+    }
+  }
+
+  // 방향 라벨도 회전 (상→좌, 좌→하, 하→우, 우→상 for CCW / 상→우, 우→하, 하→좌, 좌→상 for CW)
+  const dl = edDirLabels;
+  if (dir === 'cw') {
+    edDirLabels = { top: dl.left, right: dl.top, bottom: dl.right, left: dl.bottom };
+  } else {
+    edDirLabels = { top: dl.right, left: dl.top, bottom: dl.left, right: dl.bottom };
+  }
+  ['top','bottom','left','right'].forEach(s => {
+    const el = document.getElementById('edDir' + s.charAt(0).toUpperCase() + s.slice(1));
+    if (el) el.value = edDirLabels[s] || '';
+  });
+
+  const dataURL = cvs.toDataURL('image/webp', 0.95);
+  edImageURL = dataURL;
+  img.src = dataURL;
+  img.onload = () => {
+    edImgNW = img.naturalWidth; edImgNH = img.naturalHeight;
+    edApplyZoom(); edRenderAllBoxes(); edUpdateAlignGuide(); edApplyDirLabels();
+  };
+  showToast(dir === 'cw' ? '↻ 시계방향 90° 회전' : '↺ 반시계방향 90° 회전');
+}
+
+// ── 방향 설명 라벨 ──
+let edDirLabels = { top: '', bottom: '', left: '', right: '' };
+function edApplyDirLabels() {
+  ['top','bottom','left','right'].forEach(s => {
+    const inp = document.getElementById('edDir' + s.charAt(0).toUpperCase() + s.slice(1));
+    if (inp) edDirLabels[s] = inp.value;
+  });
+  const wrap = document.getElementById('edCanvasWrapper');
+  if (!wrap) return;
+  wrap.querySelectorAll('.ed-dir-label').forEach(el => el.remove());
+  ['top','bottom','left','right'].forEach(s => {
+    const txt = (edDirLabels[s] || '').trim();
+    if (!txt) return;
+    const el = document.createElement('div');
+    el.className = 'ed-dir-label ' + s;
+    el.textContent = txt;
+    wrap.appendChild(el);
+  });
 }
 
 // ── 동 탭 ──
@@ -2795,6 +3157,7 @@ function edSaveToMap(){
       boxes: boxData,
       groupName: gName,
       imgDataURL,
+      dirLabels: { ...edDirLabels },
       savedAt: new Date().toISOString()
     };
     // 평면도를 저장했다면 전체지도에도 자동 추가
@@ -2913,12 +3276,13 @@ function edLoadLayout(input) {
 // MAP BACKGROUND — OSM TILES
 // ═══════════════════════════════════════════════
 const MAPBG_KEY = 'wirye_mapbg_v1';
-let mapBgOn = false;
+let mapBgOn = true; // 기본 활성화
 let mapScale = 3.0;
 let mapShiftX = 0, mapShiftY = 0;
 let mapOpacity = 0.55;
+let mapBgCtrlCollapsed = false;
 
-// 저장된 지도 배경 상태 복원
+// 저장된 지도 배경 상태 복원 (저장된 값이 있으면 그대로, 없으면 기본=ON)
 try {
   const _m = localStorage.getItem(MAPBG_KEY);
   if (_m) {
@@ -2927,13 +3291,23 @@ try {
     if (typeof st.shiftX === 'number') mapShiftX = st.shiftX;
     if (typeof st.shiftY === 'number') mapShiftY = st.shiftY;
     if (typeof st.opacity === 'number') mapOpacity = st.opacity;
-    if (st.on) mapBgOn = true; // applyMapBgFromState로 토글
+    mapBgOn = st.on !== false; // false 명시된 경우만 OFF
+    if (typeof st.collapsed === 'boolean') mapBgCtrlCollapsed = st.collapsed;
   }
 } catch(e) {}
 
+function toggleMapBgCtrlCollapse() {
+  mapBgCtrlCollapsed = !mapBgCtrlCollapsed;
+  const ctrl = document.getElementById('mapBgControls');
+  const btn = document.getElementById('mapBgCtrlToggle');
+  if (ctrl) ctrl.classList.toggle('collapsed', mapBgCtrlCollapsed);
+  if (btn) btn.textContent = mapBgCtrlCollapsed ? '+' : '−';
+  saveMapBgState();
+}
+
 let _mapBgSaveTimer = null;
 function saveMapBgState() {
-  const st = { on: mapBgOn, scale: mapScale, shiftX: mapShiftX, shiftY: mapShiftY, opacity: mapOpacity };
+  const st = { on: mapBgOn, scale: mapScale, shiftX: mapShiftX, shiftY: mapShiftY, opacity: mapOpacity, collapsed: mapBgCtrlCollapsed };
   try { localStorage.setItem(MAPBG_KEY, JSON.stringify(st)); } catch(e) {}
   // 디바운스 클라우드 저장
   clearTimeout(_mapBgSaveTimer);
@@ -2949,7 +3323,12 @@ function applyMapBgFromState() {
   const ctrl = document.getElementById('mapBgControls');
   loadMapTiles();
   if (canvas) canvas.classList.add('map-bg-on');
-  if (ctrl) ctrl.classList.add('visible');
+  if (ctrl) {
+    ctrl.classList.add('visible');
+    ctrl.classList.toggle('collapsed', mapBgCtrlCollapsed);
+  }
+  const tg = document.getElementById('mapBgCtrlToggle');
+  if (tg) tg.textContent = mapBgCtrlCollapsed ? '+' : '−';
   const sl = document.getElementById('mapOpacitySlider');
   if (sl) sl.value = Math.round(mapOpacity * 100);
   const c = document.getElementById('mapTileContainer');
@@ -3175,7 +3554,20 @@ async function cloudLoadAll() {
       .from(SUPABASE_BUCKET).download('_positions.json');
     if (posFile) {
       const cloudPos = JSON.parse(await posFile.text());
-      if (Object.keys(cloudPos).length > 0) positions = cloudPos;
+      if (Object.keys(cloudPos).length > 0) {
+        // 로컬 사용자 설정 폭/높이를 보존 (클라우드가 빈값이어도 덮어쓰지 않음)
+        const merged = { ...cloudPos };
+        Object.keys(positions).forEach(k => {
+          const lp = positions[k];
+          if (!lp) return;
+          if (!merged[k]) merged[k] = lp;
+          else {
+            if (lp.w && !merged[k].w) merged[k].w = lp.w;
+            if (lp.h && !merged[k].h) merged[k].h = lp.h;
+          }
+        });
+        positions = merged;
+      }
     }
 
     // 2-1) _active.json 다운로드 (활성 건물 + 지도 배경 상태)
