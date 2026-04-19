@@ -598,6 +598,10 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
           </div>
         </div>
         <span id="edImgName" style="font-size:10px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+        <div id="edStorageStat" style="font-size:10px;color:var(--text3);padding:3px 8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;line-height:1.5;border-top:1px dashed var(--line);margin-top:4px">
+          <span id="edStorageLocal" title="브라우저 localStorage 사용량 (용량 초과 시 이미지 저장 경고 원인)">💾 브라우저 —</span>
+          <span id="edStorageCloud" title="Supabase 클라우드 저장소 사용량 (동기화 시 갱신)" style="cursor:pointer" onclick="refreshCloudUsage()">☁️ 클라우드 <span style="color:var(--blue);text-decoration:underline">새로고침</span></span>
+        </div>
       </div>
 
       <div class="editor-sidebar-top" style="border-bottom:none;padding-top:4px;padding-bottom:2px">
@@ -906,6 +910,8 @@ function switchPage(page) {
   // 전체지도용 컨트롤 표시/숨김
   document.getElementById('mapSearchWrap').style.display = page === 'map' ? '' : 'none';
   document.getElementById('mapActions').style.display = page === 'map' ? '' : 'none';
+  // 편집 페이지 진입 시 저장공간 표시 갱신 (브라우저 즉시, 클라우드는 캐시 사용)
+  if (page === 'editor') refreshAllStorageStats(false);
 }
 
 // ═══════════════════════════════════════════════
@@ -3228,6 +3234,7 @@ function edSaveToMap(){
     } catch(e) {
       tryCompressedSave(imgDataURL, bName, boxData);
     }
+    updateLocalStorageStat();
     // 클라우드에도 비동기 저장
     cloudSaveAll();
   }
@@ -3517,6 +3524,79 @@ function updateSyncStatus(msg, isError) {
   if (!isError) setTimeout(() => { el.textContent = ''; }, 4000);
 }
 
+// ── 저장공간 사용량 표시 ──
+function formatBytes(b){
+  if(!b) return '0B';
+  if(b<1024) return b+'B';
+  if(b<1024*1024) return (b/1024).toFixed(1)+'KB';
+  if(b<1024*1024*1024) return (b/1024/1024).toFixed(1)+'MB';
+  return (b/1024/1024/1024).toFixed(2)+'GB';
+}
+function getLocalStorageUsage(){
+  let total = 0;
+  try {
+    for (let i=0; i<localStorage.length; i++) {
+      const k = localStorage.key(i); if (!k) continue;
+      const v = localStorage.getItem(k) || '';
+      total += (k.length + v.length) * 2; // UTF-16 근사치
+    }
+  } catch(e){}
+  return total;
+}
+function updateLocalStorageStat(){
+  const el = document.getElementById('edStorageLocal');
+  if (!el) return;
+  const used = getLocalStorageUsage();
+  const limit = 5 * 1024 * 1024; // 브라우저 일반 한계 5MB (Chrome은 10MB지만 안전한 표시)
+  const pct = Math.min(999, Math.round(used / limit * 100));
+  const color = pct >= 90 ? 'var(--red)' : pct >= 70 ? '#d97706' : 'var(--text3)';
+  el.style.color = color;
+  el.innerHTML = `💾 브라우저 <b style="color:${color}">${formatBytes(used)}</b>/~5MB <span style="color:var(--text3)">(${pct}%)</span>`;
+}
+let _cloudUsageCache = null; // { bytes, count, at }
+async function updateCloudStorageStat(force){
+  const el = document.getElementById('edStorageCloud');
+  if (!el) return;
+  if (!force && _cloudUsageCache && Date.now() - _cloudUsageCache.at < 30000) {
+    renderCloudStat(_cloudUsageCache.bytes, _cloudUsageCache.count);
+    return;
+  }
+  const supabase = getSupabase();
+  if (!supabase) { el.innerHTML = '☁️ 클라우드 <span style="color:var(--red)">미연결</span>'; return; }
+  el.innerHTML = '☁️ 클라우드 <span style="color:var(--text2)">확인 중...</span>';
+  try {
+    const folders = ['', 'img'];
+    let totalBytes = 0, fileCount = 0;
+    for (const folder of folders) {
+      const { data, error } = await supabase.storage.from(SUPABASE_BUCKET).list(folder, { limit: 1000 });
+      if (error || !data) continue;
+      for (const f of data) {
+        const sz = f?.metadata?.size;
+        if (typeof sz === 'number') { totalBytes += sz; fileCount++; }
+      }
+    }
+    _cloudUsageCache = { bytes: totalBytes, count: fileCount, at: Date.now() };
+    renderCloudStat(totalBytes, fileCount);
+  } catch(e) {
+    el.innerHTML = '☁️ 클라우드 <span style="color:var(--red)">확인 실패</span>';
+  }
+}
+function renderCloudStat(bytes, count){
+  const el = document.getElementById('edStorageCloud');
+  if (!el) return;
+  const limit = 1024 * 1024 * 1024; // Supabase 무료 1GB
+  const pct = Math.min(999, (bytes / limit * 100));
+  const pctStr = pct < 0.1 ? '<0.1' : pct.toFixed(1);
+  const color = pct >= 90 ? 'var(--red)' : pct >= 70 ? '#d97706' : 'var(--text3)';
+  el.style.color = color;
+  el.innerHTML = `☁️ 클라우드 <b style="color:${color}">${formatBytes(bytes)}</b>/1GB <span style="color:var(--text3)">(${pctStr}%, ${count}개)</span>`;
+}
+function refreshCloudUsage(){ updateCloudStorageStat(true); }
+function refreshAllStorageStats(cloudForce){
+  updateLocalStorageStat();
+  updateCloudStorageStat(cloudForce);
+}
+
 async function cloudSaveAll() {
   const supabase = getSupabase();
   if (!supabase) { updateSyncStatus('Supabase 미연결', true); return; }
@@ -3568,6 +3648,7 @@ async function cloudSaveAll() {
 
     updateSyncStatus('☁️ 저장 완료');
     showToast('☁️ 클라우드 저장 완료');
+    refreshAllStorageStats(true); // 클라우드 저장 후 용량 갱신
   } catch (e) {
     console.error('cloudSaveAll error:', e);
     updateSyncStatus('☁️ 저장 실패', true);
@@ -3693,6 +3774,7 @@ async function cloudLoadAll() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(positions)); } catch(e) {}
 
     updateSyncStatus(`☁️ 동기화 완료 (이미지 ${imgDone}/${imgCount})`);
+    refreshAllStorageStats(true); // 동기화 후 용량 갱신
     return true;
   } catch (e) {
     console.error('cloudLoadAll error:', e);
