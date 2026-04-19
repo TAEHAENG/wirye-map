@@ -507,6 +507,7 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
   </div>
 
   <div class="topbar-actions" id="mapActions">
+    <button class="filter-toggle" id="adminModeBtn" title="관리자 모드 ON 시 소유자/상담내용 표시" onclick="toggleAdminMode()">🔒 관리자</button>
     <button class="btn primary" id="addBldgBtn" title="DB에서 건물을 골라 지도에 추가합니다" onclick="openAddBuildingPopup()" style="font-size:11px">＋ 건물 추가</button>
     <button class="filter-toggle" id="mapBgBtn" title="배경에 OSM 지도를 표시/숨김합니다" onclick="toggleMapBg()">🗺️ 지도</button>
     <button class="filter-toggle" id="vacantFilter" title="공실만 보기">공실만</button>
@@ -1418,7 +1419,6 @@ function buildFloorplanView(bName, fp) {
 
   // 이미지 로드 후: 이미지 비율에 맞춰 카드 폭 조절 + 글씨 크기 계산
   const renderBoxes = () => {
-    container.querySelectorAll('.card-fp-box').forEach(el => el.remove());
     // 이미지 비율에 따라 카드 폭 자동 조절 (사용자가 수동으로 크기 설정한 경우 건너뜀)
     const natW = img.naturalWidth || 1, natH = img.naturalHeight || 1;
     const ratio = natW / natH;
@@ -1431,7 +1431,15 @@ function buildFloorplanView(bName, fp) {
     } else if (card && !userSized && ratio < 0.6) {
       card.style.width = Math.max(400, Math.round(640 * ratio * 1.2)) + 'px';
     }
-    const cW = container.offsetWidth || 300;
+    // 컨테이너 너비 획득 — 레이아웃 전이면 재시도
+    const cW = container.offsetWidth;
+    if (!cW) {
+      renderBoxes._tries = (renderBoxes._tries || 0) + 1;
+      if (renderBoxes._tries < 30) requestAnimationFrame(renderBoxes);
+      return;
+    }
+    renderBoxes._tries = 0;
+    container.querySelectorAll('.card-fp-box').forEach(el => el.remove());
     const scale = cW / natW;
     // 편집기와 동일한 비율의 텍스트 크기 (편집기 obox-name: 11px 기준)
     const baseFontPx = 11;
@@ -1485,6 +1493,15 @@ function buildFloorplanView(bName, fp) {
   img.onload = renderBoxes;
   // 폴백: 이미 캐싱된 이미지
   if (img.complete) requestAnimationFrame(renderBoxes);
+  // 카드 크기 변경 시 텍스트 비율 재계산
+  if (window.ResizeObserver) {
+    let rbTimer = null;
+    const ro = new ResizeObserver(() => {
+      if (rbTimer) cancelAnimationFrame(rbTimer);
+      rbTimer = requestAnimationFrame(() => { if (img.complete && img.naturalWidth) renderBoxes(); });
+    });
+    ro.observe(container);
+  }
 
   container.title = '클릭하면 확대 보기';
   container.addEventListener('click', (ev) => {
@@ -1711,8 +1728,15 @@ function openFloorplanFullscreen(bName, fp) {
   const renderFSBoxes = () => {
     const bCol = sheetHeaders.find(h => h === '건물명' || h === '상가명') || '';
     const dongCol = sheetHeaders.find(h => h === '동') || '';
-    const dispW = img.offsetWidth || img.naturalWidth;
+    const dispW = img.offsetWidth;
     const natW = img.naturalWidth || 1;
+    if (!dispW) {
+      renderFSBoxes._tries = (renderFSBoxes._tries || 0) + 1;
+      if (renderFSBoxes._tries < 30) requestAnimationFrame(renderFSBoxes);
+      return;
+    }
+    renderFSBoxes._tries = 0;
+    inner.querySelectorAll('.card-fp-box').forEach(el => el.remove());
     const scale = dispW / natW;
     const baseFontPx = 11;
     for (const [key, b] of Object.entries(fp.boxes)) {
@@ -1889,16 +1913,44 @@ document.getElementById('zoomOut').addEventListener('click',()=>setZoom(zoomScal
 document.getElementById('zoomFit').addEventListener('click',()=>{zoomScale=1;panOffset={x:80,y:80};applyTransform();});
 
 // ── DETAIL PANEL ──
+// ── 관리자 모드 (소유자·상담내용 노출 제어) ──
+const ADMIN_KEY = 'wirye_admin_v1';
+let adminMode = localStorage.getItem(ADMIN_KEY) === '1';
+function updateAdminBtnUI(){
+  const btn = document.getElementById('adminModeBtn');
+  if(!btn) return;
+  btn.classList.toggle('on', adminMode);
+  btn.textContent = adminMode ? '🔓 관리자 ON' : '🔒 관리자';
+  btn.title = adminMode ? '관리자 모드 ON — 소유자/상담내용이 표시됩니다 (클릭하여 끄기)' : '관리자 모드 OFF — 소유자/상담내용이 숨겨집니다 (클릭하여 켜기)';
+}
+function toggleAdminMode(){
+  adminMode = !adminMode;
+  localStorage.setItem(ADMIN_KEY, adminMode ? '1' : '0');
+  updateAdminBtnUI();
+  showToast(adminMode ? '🔓 관리자 모드 ON' : '🔒 관리자 모드 OFF');
+  // 상세 패널이 열려 있으면 재렌더 (소유자/상담내용 토글 반영)
+  const panel = document.getElementById('detailPanel');
+  if(panel && panel.classList.contains('open') && _lastDetail){
+    openDetail(_lastDetail.room, _lastDetail.bName);
+  }
+}
+updateAdminBtnUI();
+
+let _lastDetail = null;
 function openDetail(room,bName){
+  _lastDetail = { room, bName };
   const p=document.getElementById('detailPanel'),t=document.getElementById('panelTitle'),st=document.getElementById('panelSubtitle'),bd=document.getElementById('panelBody');
   const ho=room['호']||'-',nm=roomName(room)||'공실',dong=room['동']||'',fl=parseFloor(room['호']||'');
   t.textContent=`${ho}호 — ${nm}`; st.textContent=`${bName}${dong?' · '+dong:''} · ${fl}`;
   const rv=k=>room[k]||'';
-  const fields=[['상태',isVacant(room)?'<span class="info-value vacant">공실</span>':'<span class="info-value occupied">입점</span>'],['현재상호',rv('현재상호')||rv('상호')],['과거상호',rv('과거입점상호')],['전용(평)',rv('전용(평)')||rv('전용 평')],['보증금',rv('보증금')?rv('보증금')+' 만원':''],['월세',rv('월세')?rv('월세')+' 만원':''],['매매가',rv('매매가')],['소유자',rv('소유자')],['프로세스',rv('프로세스')],['유형',rv('유형')]];
+  const baseFields=[['상태',isVacant(room)?'<span class="info-value vacant">공실</span>':'<span class="info-value occupied">입점</span>'],['현재상호',rv('현재상호')||rv('상호')],['과거상호',rv('과거입점상호')],['전용(평)',rv('전용(평)')||rv('전용 평')],['보증금',rv('보증금')?rv('보증금')+' 만원':''],['월세',rv('월세')?rv('월세')+' 만원':''],['매매가',rv('매매가')],['프로세스',rv('프로세스')],['유형',rv('유형')]];
+  const fields = adminMode ? [...baseFields, ['소유자', rv('소유자')]] : baseFields;
   let html='';
   fields.forEach(([l,v])=>{if(!v)return;const c=l==='보증금'||l==='월세'||l==='매매가'?' money':'';html+=`<div class="info-row"><div class="info-label">${l}</div><div class="info-value${c}">${v}</div></div>`;});
-  const memo=rv('상담 내용')||rv('내용');
-  if(memo) html+=`<div class="panel-section-title">상담 내용</div><div class="panel-memo">${escHtml(memo)}</div>`;
+  if(adminMode){
+    const memo=rv('상담 내용')||rv('내용');
+    if(memo) html+=`<div class="panel-section-title">상담 내용</div><div class="panel-memo">${escHtml(memo)}</div>`;
+  }
   bd.innerHTML=html||'<div style="color:var(--text3);text-align:center;padding:20px">데이터 없음</div>';
   p.classList.add('open');
 }
