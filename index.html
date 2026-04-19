@@ -446,6 +446,13 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
   .main-tab{padding:4px 10px;font-size:11px}
   .topbar-actions .btn,.topbar-actions .filter-toggle{height:28px;padding:0 8px;font-size:10px}
   .topbar-actions #syncStatus{display:none}
+  /* 모바일: 지도 배경 조절 패널을 상단으로 이동 (하단 잘림 방지) */
+  .map-bg-ctrl{bottom:auto!important;top:10px;left:10px;padding:6px 8px;gap:4px;max-width:calc(100vw - 20px);background:rgba(255,255,255,.96);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+  .map-bg-ctrl .zoom-btn{width:28px;height:28px;font-size:13px}
+  .map-bg-ctrl-title{font-size:9px;padding:0 2px}
+  .map-bg-ctrl-row{gap:3px}
+  .map-bg-ctrl-val{font-size:9px;min-width:32px}
+  .map-bg-ctrl-toggle{top:-8px;right:-8px;width:20px;height:20px;font-size:10px}
 }
 </style>
 </head>
