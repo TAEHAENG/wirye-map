@@ -334,8 +334,9 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
 /* Editor Canvas */
 .ed-canvas-area{flex:1;overflow:auto;background:#e8eaf0;background-image:radial-gradient(circle,#c8cde0 1px,transparent 1px);background-size:20px 20px;position:relative}
 .ed-canvas-scroller{min-width:100%;min-height:100%;display:flex;align-items:flex-start;justify-content:flex-start;padding:24px}
-.ed-canvas-wrapper{position:relative;display:inline-block;box-shadow:var(--shadow-lg);border-radius:2px;cursor:crosshair;user-select:none;flex-shrink:0}
-#ed-floorplan-img{display:block;max-width:none}
+.ed-canvas-wrapper{position:relative;display:inline-block;box-shadow:var(--shadow-lg);border-radius:2px;cursor:crosshair;user-select:none;flex-shrink:0;overflow:hidden}
+#ed-floorplan-img{display:block;max-width:none;position:absolute;cursor:move;user-select:none}
+#ed-img-resize-handle{position:absolute;bottom:0;right:0;width:16px;height:16px;background:#2563eb;border-radius:1px;cursor:nwse-resize;opacity:0.8;z-index:100}
 
 /* Floor plan drop zone */
 .img-dropzone{border:2px dashed var(--line2);border-radius:10px;min-height:300px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:all .2s;background:var(--paper);font-size:13px;color:var(--text2);position:relative;margin:40px}
@@ -1440,9 +1441,31 @@ function buildFloorplanView(bName, fp) {
     const userSized = cid && positions[cid]?.w;
     if (card && !userSized && ratio > 1.3) {
       const newW = Math.min(1920, Math.round(640 * ratio));
+      const newH = Math.round(newW / ratio);
       card.style.width = newW + 'px';
+      card.style.height = newH + 'px';
+      // 카드 비율 저장 (편집기에서 사용)
+      if (!positions[cid]) positions[cid] = { x: 0, y: 0 };
+      positions[cid].cardWidth = newW;
+      positions[cid].cardHeight = newH;
     } else if (card && !userSized && ratio < 0.6) {
-      card.style.width = Math.max(400, Math.round(640 * ratio * 1.2)) + 'px';
+      const newW = Math.max(400, Math.round(640 * ratio * 1.2));
+      const newH = Math.round(newW / ratio);
+      card.style.width = newW + 'px';
+      card.style.height = newH + 'px';
+      // 카드 비율 저장
+      if (!positions[cid]) positions[cid] = { x: 0, y: 0 };
+      positions[cid].cardWidth = newW;
+      positions[cid].cardHeight = newH;
+    } else if (card && !userSized) {
+      // 기본 비율 (1:1 또는 표준)
+      const newW = 640;
+      const newH = Math.round(newW / ratio);
+      card.style.width = newW + 'px';
+      card.style.height = newH + 'px';
+      if (!positions[cid]) positions[cid] = { x: 0, y: 0 };
+      positions[cid].cardWidth = newW;
+      positions[cid].cardHeight = newH;
     }
     // 컨테이너 너비 획득 — 레이아웃 전이면 재시도
     const cW = container.offsetWidth;
@@ -2375,6 +2398,17 @@ function edLoadGroup(bName, gName) {
     }
   }
 
+  // 카드 비율 복원 (전체지도 카드 크기로 캔버스 설정)
+  const cardId = 'card_' + btoa(encodeURIComponent(bName)).replace(/[^a-zA-Z0-9]/g, '_');
+  const pos = positions[cardId];
+  if (pos && pos.cardWidth && pos.cardHeight) {
+    const wrapper = document.getElementById('edCanvasWrapper');
+    if (wrapper) {
+      wrapper.style.width = pos.cardWidth + 'px';
+      wrapper.style.height = pos.cardHeight + 'px';
+    }
+  }
+
   // 이미지 복원
   if (saved.imgDataURL) {
     edImageURL = saved.imgDataURL;
@@ -2385,7 +2419,9 @@ function edLoadGroup(bName, gName) {
     img.src = saved.imgDataURL;
     img.onload = () => {
       edImgNW = img.naturalWidth; edImgNH = img.naturalHeight;
+      edImgX = 0; edImgY = 0; // 위치 초기화
       edApplyZoom(); edRenderAllBoxes(); edUpdateAlignGuide(); edApplyDirLabels();
+      edSetupImageDragResize(); // 드래그 기능 활성화
     };
     document.getElementById('edCanvasWrapper').removeEventListener('click', edOnCanvasClick);
     document.getElementById('edCanvasWrapper').addEventListener('click', edOnCanvasClick);
@@ -2426,8 +2462,10 @@ function edHandleImage(input) {
   img.src = edImageURL;
   img.onload = () => {
     edImgNW = img.naturalWidth; edImgNH = img.naturalHeight;
+    edImgX = 0; edImgY = 0; // 위치 초기화
     edApplyZoom(); edRenderAllBoxes();
     edUpdateAlignGuide();
+    edSetupImageDragResize(); // 드래그 기능 활성화
   };
   const _wrap = document.getElementById('edCanvasWrapper');
   if (!_wrap._clickBound) { _wrap.addEventListener('click', edOnCanvasClick); _wrap._clickBound = true; }
@@ -2692,8 +2730,10 @@ function edComposeApply() {
   img.src = dataURL;
   img.onload = () => {
     edImgNW = img.naturalWidth; edImgNH = img.naturalHeight;
+    edImgX = 0; edImgY = 0; // 위치 초기화
     edApplyZoom(); edRenderAllBoxes();
     edUpdateAlignGuide();
+    edSetupImageDragResize(); // 드래그 기능 활성화
   };
   const wrap = document.getElementById('edCanvasWrapper');
   if (!wrap._clickBound) { wrap.addEventListener('click', edOnCanvasClick); wrap._clickBound = true; }
@@ -3172,9 +3212,91 @@ function edStartRotate(e) {
   window.addEventListener('mousemove',move);window.addEventListener('mouseup',up);
 }
 
+// 이미지 위치/크기 상태
+let edImgX = 0, edImgY = 0;
+
 // ── Zoom ──
 function edChangeZoom(d){edZoom=Math.max(.2,Math.min(5,edZoom+d));edApplyZoom();}
-function edApplyZoom(){const img=document.getElementById('ed-floorplan-img');img.style.width=(edImgNW*edZoom)+'px';img.style.height=(edImgNH*edZoom)+'px';document.getElementById('edZoomVal').textContent=Math.round(edZoom*100)+'%';}
+function edApplyZoom(){
+  const img=document.getElementById('ed-floorplan-img');
+  const zW = edImgNW*edZoom;
+  const zH = edImgNH*edZoom;
+  img.style.width=zW+'px';
+  img.style.height=zH+'px';
+  img.style.left=edImgX+'px';
+  img.style.top=edImgY+'px';
+  document.getElementById('edZoomVal').textContent=Math.round(edZoom*100)+'%';
+}
+
+// 이미지 드래그/리사이즈 설정
+function edSetupImageDragResize() {
+  const img = document.getElementById('ed-floorplan-img');
+  const wrapper = document.getElementById('edCanvasWrapper');
+  if (!img || !wrapper) return;
+
+  // 리사이즈 핸들 추가
+  let handle = document.getElementById('ed-img-resize-handle');
+  if (!handle) {
+    handle = document.createElement('div');
+    handle.id = 'ed-img-resize-handle';
+    wrapper.appendChild(handle);
+  }
+
+  // 드래그 이동
+  let isDragging = false, startX, startY, startLeft, startTop;
+  img.addEventListener('mousedown', (e) => {
+    if (e.target.id === 'ed-img-resize-handle') return;
+    isDragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    startLeft = edImgX;
+    startTop = edImgY;
+    img.style.cursor = 'grabbing';
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    edImgX = startLeft + dx;
+    edImgY = startTop + dy;
+    img.style.left = edImgX + 'px';
+    img.style.top = edImgY + 'px';
+  });
+
+  document.addEventListener('mouseup', () => {
+    isDragging = false;
+    img.style.cursor = 'move';
+  });
+
+  // 리사이즈
+  let isResizing = false, resizeStartX, resizeStartY, resizeStartW, resizeStartH;
+  handle.addEventListener('mousedown', (e) => {
+    isResizing = true;
+    resizeStartX = e.clientX;
+    resizeStartY = e.clientY;
+    resizeStartW = edImgNW * edZoom;
+    resizeStartH = edImgNH * edZoom;
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!isResizing) return;
+    const dw = e.clientX - resizeStartX;
+    const dh = e.clientY - resizeStartY;
+    const newW = Math.max(50, resizeStartW + dw);
+    const newH = Math.max(50, resizeStartH + dh);
+    // 가로세로 비율 유지
+    const ratio = edImgNW / edImgNH;
+    const actualH = newW / ratio;
+    edZoom = newW / edImgNW;
+    edApplyZoom();
+  });
+
+  document.addEventListener('mouseup', () => {
+    isResizing = false;
+  });
+}
 function edClearAllBoxes(){if(!confirm('모든 박스를 초기화할까요?'))return;edBoxes={};edRenderAllBoxes();edRenderUnitList();}
 
 // 이 그룹(층) 초기화 — 현재 선택된 그룹의 배치+이미지만 삭제
@@ -3192,6 +3314,7 @@ function edClearGroupBoxes(){
   localStorage.setItem(FLOORPLAN_KEY, JSON.stringify(floorplans));
   // 편집기 이미지 초기화
   edImageURL='';
+  edImgX = 0; edImgY = 0; // 위치 초기화
   document.getElementById('ed-floorplan-img').src='';
   document.getElementById('edDropzone').classList.remove('has-file');
   document.getElementById('edCanvasScroller').style.display='none';
