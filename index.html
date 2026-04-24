@@ -3137,6 +3137,8 @@ function edOnCanvasClick(e) {
 function edRenderAllBoxes() {
   const wr = document.getElementById('edCanvasWrapper');
   wr.querySelectorAll('.obox').forEach(el=>el.remove());
+  // 캔버스 너비 기반 폰트 크기 계산
+  const canvasW = edImgNW * edZoom;
   for (const [bkey,b] of Object.entries(edBoxes)) {
     const el = document.createElement('div');
     const selKey = edSelectedUnit ? edBoxKey(edSelectedUnit) : '';
@@ -3147,7 +3149,10 @@ function edRenderAllBoxes() {
     const ta = b.textAlign || 'left';
     const rotDeg = b.rot || 0;
     const displayName = b.unit?.상호명 || b.name || b.unit?.호수 || bkey;
-    el.innerHTML = `<div class="obox-hosu">${b.unit?.호수||bkey}</div><div class="obox-name" style="text-align:${ta}">${displayName}</div><div class="obox-del">✕</div><div class="obox-rotate-label">${rotDeg}°</div><div class="obox-rotate" title="드래그하여 회전">↻</div><div class="obox-resize"></div>`;
+    // 박스 너비 기반 폰트 크기 (전체지도와 동일한 로직)
+    const boxWidthPx = canvasW * (b.w / 100);
+    const fName = Math.max(9, Math.min(26, boxWidthPx * 0.12));
+    el.innerHTML = `<div class="obox-hosu">${b.unit?.호수||bkey}</div><div class="obox-name" style="text-align:${ta};font-size:${fName}px">${displayName}</div><div class="obox-del">✕</div><div class="obox-rotate-label">${rotDeg}°</div><div class="obox-rotate" title="드래그하여 회전">↻</div><div class="obox-resize"></div>`;
     el.querySelector('.obox-del').addEventListener('click',ev=>{ev.stopPropagation();delete edBoxes[bkey];edRenderAllBoxes();edRenderUnitList();});
     el.querySelector('.obox-rotate').addEventListener('mousedown',edStartRotate);
     el.addEventListener('mousedown',edStartDrag);
