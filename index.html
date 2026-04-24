@@ -334,9 +334,9 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
 /* Editor Canvas */
 .ed-canvas-area{flex:1;overflow:auto;background:#e8eaf0;background-image:radial-gradient(circle,#c8cde0 1px,transparent 1px);background-size:20px 20px;position:relative}
 .ed-canvas-scroller{min-width:100%;min-height:100%;display:flex;align-items:flex-start;justify-content:flex-start;padding:24px}
-.ed-canvas-wrapper{position:relative;display:inline-block;box-shadow:var(--shadow-lg);border-radius:2px;cursor:crosshair;user-select:none;flex-shrink:0;overflow:hidden}
-#ed-floorplan-img{display:block;max-width:none;position:absolute;cursor:move;user-select:none}
-#ed-img-resize-handle{position:absolute;bottom:0;right:0;width:16px;height:16px;background:#2563eb;border-radius:1px;cursor:nwse-resize;opacity:0.8;z-index:100}
+.ed-canvas-wrapper{position:relative;display:inline-block;box-shadow:var(--shadow-lg);border-radius:2px;cursor:crosshair;user-select:none;flex-shrink:0;overflow:hidden;background:#f9fafb}
+#ed-floorplan-img{display:block;max-width:100%;height:auto;cursor:grab;user-select:none}
+#ed-img-resize-handle{position:absolute;bottom:0;right:0;width:16px;height:16px;background:#2563eb;border-radius:1px;cursor:nwse-resize;opacity:0.8;z-index:100;display:none}
 
 /* Floor plan drop zone */
 .img-dropzone{border:2px dashed var(--line2);border-radius:10px;min-height:300px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:all .2s;background:var(--paper);font-size:13px;color:var(--text2);position:relative;margin:40px}
@@ -2419,9 +2419,9 @@ function edLoadGroup(bName, gName) {
     img.src = saved.imgDataURL;
     img.onload = () => {
       edImgNW = img.naturalWidth; edImgNH = img.naturalHeight;
-      edImgX = 0; edImgY = 0; // 위치 초기화
+      edZoom = 1.0; // 줌 초기화
       edApplyZoom(); edRenderAllBoxes(); edUpdateAlignGuide(); edApplyDirLabels();
-      edSetupImageDragResize(); // 드래그 기능 활성화
+      edSetupImageDragResize();
     };
     document.getElementById('edCanvasWrapper').removeEventListener('click', edOnCanvasClick);
     document.getElementById('edCanvasWrapper').addEventListener('click', edOnCanvasClick);
@@ -3212,90 +3212,18 @@ function edStartRotate(e) {
   window.addEventListener('mousemove',move);window.addEventListener('mouseup',up);
 }
 
-// 이미지 위치/크기 상태
-let edImgX = 0, edImgY = 0;
-
 // ── Zoom ──
 function edChangeZoom(d){edZoom=Math.max(.2,Math.min(5,edZoom+d));edApplyZoom();}
 function edApplyZoom(){
   const img=document.getElementById('ed-floorplan-img');
-  const zW = edImgNW*edZoom;
-  const zH = edImgNH*edZoom;
-  img.style.width=zW+'px';
-  img.style.height=zH+'px';
-  img.style.left=edImgX+'px';
-  img.style.top=edImgY+'px';
+  img.style.width=(edImgNW*edZoom)+'px';
+  img.style.height=(edImgNH*edZoom)+'px';
   document.getElementById('edZoomVal').textContent=Math.round(edZoom*100)+'%';
 }
 
-// 이미지 드래그/리사이즈 설정
+// 이미지 드래그/리사이즈 설정 (현재는 기본 크기 맞추기만)
 function edSetupImageDragResize() {
-  const img = document.getElementById('ed-floorplan-img');
-  const wrapper = document.getElementById('edCanvasWrapper');
-  if (!img || !wrapper) return;
-
-  // 리사이즈 핸들 추가
-  let handle = document.getElementById('ed-img-resize-handle');
-  if (!handle) {
-    handle = document.createElement('div');
-    handle.id = 'ed-img-resize-handle';
-    wrapper.appendChild(handle);
-  }
-
-  // 드래그 이동
-  let isDragging = false, startX, startY, startLeft, startTop;
-  img.addEventListener('mousedown', (e) => {
-    if (e.target.id === 'ed-img-resize-handle') return;
-    isDragging = true;
-    startX = e.clientX;
-    startY = e.clientY;
-    startLeft = edImgX;
-    startTop = edImgY;
-    img.style.cursor = 'grabbing';
-  });
-
-  document.addEventListener('mousemove', (e) => {
-    if (!isDragging) return;
-    const dx = e.clientX - startX;
-    const dy = e.clientY - startY;
-    edImgX = startLeft + dx;
-    edImgY = startTop + dy;
-    img.style.left = edImgX + 'px';
-    img.style.top = edImgY + 'px';
-  });
-
-  document.addEventListener('mouseup', () => {
-    isDragging = false;
-    img.style.cursor = 'move';
-  });
-
-  // 리사이즈
-  let isResizing = false, resizeStartX, resizeStartY, resizeStartW, resizeStartH;
-  handle.addEventListener('mousedown', (e) => {
-    isResizing = true;
-    resizeStartX = e.clientX;
-    resizeStartY = e.clientY;
-    resizeStartW = edImgNW * edZoom;
-    resizeStartH = edImgNH * edZoom;
-    e.preventDefault();
-  });
-
-  document.addEventListener('mousemove', (e) => {
-    if (!isResizing) return;
-    const dw = e.clientX - resizeStartX;
-    const dh = e.clientY - resizeStartY;
-    const newW = Math.max(50, resizeStartW + dw);
-    const newH = Math.max(50, resizeStartH + dh);
-    // 가로세로 비율 유지
-    const ratio = edImgNW / edImgNH;
-    const actualH = newW / ratio;
-    edZoom = newW / edImgNW;
-    edApplyZoom();
-  });
-
-  document.addEventListener('mouseup', () => {
-    isResizing = false;
-  });
+  // TODO: 드래그로 크기/위치 조절 기능 (나중에 추가)
 }
 function edClearAllBoxes(){if(!confirm('모든 박스를 초기화할까요?'))return;edBoxes={};edRenderAllBoxes();edRenderUnitList();}
 
@@ -3314,7 +3242,6 @@ function edClearGroupBoxes(){
   localStorage.setItem(FLOORPLAN_KEY, JSON.stringify(floorplans));
   // 편집기 이미지 초기화
   edImageURL='';
-  edImgX = 0; edImgY = 0; // 위치 초기화
   document.getElementById('ed-floorplan-img').src='';
   document.getElementById('edDropzone').classList.remove('has-file');
   document.getElementById('edCanvasScroller').style.display='none';
