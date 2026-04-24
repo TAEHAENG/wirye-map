@@ -3679,15 +3679,9 @@ function setMapViewMode(mode) {
 }
 
 // 프로세스가 현재 보기모드에 일치하는지 판별
+// (성능 개선 중 — 당분간 비활성화, 항상 true 반환)
 function matchesMapViewMode(processStr) {
-  const proc = (processStr || '').trim();
-  switch (mapViewMode) {
-    case 'all': return true; // 모두 표시
-    case 'suggest': return proc === '제안가능(등록)';
-    case 'vacant': return proc === '공실';
-    case 'excludeVacant': return proc !== '공실';
-    default: return true;
-  }
+  return true; // 필터 무시, 모든 박스 표시
 }
 
 function adjustMapBg(action) {
