@@ -3664,12 +3664,17 @@ function setMapViewMode(mode) {
   };
   const btnId = btnMap[mode];
   if (btnId) document.getElementById(btnId).classList.add('active');
-  // 모든 카드의 박스 다시 렌더 (필터 적용)
-  Object.keys(cardStates).forEach(cid => {
-    const card = document.getElementById(cid);
-    if (card && card.dataset.buildingName) {
-      rebuildCard(cid, card.dataset.buildingName);
-    }
+
+  // 모든 박스의 표시 상태만 업데이트 (DOM 재구성 없이 빠르게 처리)
+  document.querySelectorAll('.card-fp-box').forEach(box => {
+    const hosu = box.dataset.hosu;
+    const bname = box.dataset.bname;
+    const room = rawSheetRows.find(r =>
+      (r['호']||'').trim() === hosu &&
+      ((r['건물명']||r['상가명']||'').trim() === bname)
+    );
+    const proc = room ? (room['프로세스']||'').trim() : '';
+    box.style.display = matchesMapViewMode(proc) ? '' : 'none';
   });
 }
 
