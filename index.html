@@ -339,6 +339,15 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
 .ed-canvas-wrapper{position:relative;display:inline-block;box-shadow:var(--shadow-lg);border-radius:2px;cursor:crosshair;user-select:none;flex-shrink:0;overflow:hidden;background:#f9fafb}
 #ed-floorplan-img{display:block;max-width:100%;height:auto;cursor:grab;user-select:none}
 #ed-img-resize-handle{position:absolute;bottom:0;right:0;width:16px;height:16px;background:#2563eb;border-radius:1px;cursor:nwse-resize;opacity:0.8;z-index:100;display:none}
+/* 방향 설명 버튼 */
+.ed-dir-btn{position:absolute;width:40px;height:40px;border-radius:8px;border:2px solid #9ca3af;background:#fff;font-size:18px;font-weight:bold;color:#6b7280;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;z-index:20;box-shadow:0 1px 3px rgba(0,0,0,0.1)}
+.ed-dir-btn:hover{background:#f3f4f6;border-color:#3b82f6;color:#3b82f6;box-shadow:0 2px 6px rgba(59,130,246,0.2)}
+.ed-dir-btn.ed-dir-top{top:12px;left:50%;transform:translateX(-50%)}
+.ed-dir-btn.ed-dir-bottom{bottom:12px;left:50%;transform:translateX(-50%)}
+.ed-dir-btn.ed-dir-left{top:50%;left:12px;transform:translateY(-50%)}
+.ed-dir-btn.ed-dir-right{top:50%;right:12px;transform:translateY(-50%)}
+.ed-dir-btn[data-text]:after{content:attr(data-text);position:absolute;top:-24px;left:50%;transform:translateX(-50%);background:#1f2937;color:#fff;padding:4px 8px;border-radius:4px;font-size:9px;font-weight:normal;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity 0.2s}
+.ed-dir-btn:hover[data-text]:after{opacity:1}
 
 /* Floor plan drop zone */
 .img-dropzone{border:2px dashed var(--line2);border-radius:10px;min-height:300px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:all .2s;background:var(--paper);font-size:13px;color:var(--text2);position:relative;margin:40px}
@@ -691,21 +700,6 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
         </div>
       </div>
 
-      <!-- 방향 설명 라벨 -->
-      <div class="ed-place-cfg" id="edDirLabelsCfg">
-        <div style="font-size:10px;color:var(--text2);padding:2px 2px 4px;font-weight:600">방향 설명 (상/하/좌/우)</div>
-        <div style="display:grid;grid-template-columns:auto 1fr;gap:4px;align-items:center;font-size:10px">
-          <span style="color:var(--text2);font-weight:600">↑ 상</span>
-          <input type="text" id="edDirTop" maxlength="12" placeholder="예: 도로" style="height:24px;font-size:11px;border:1.5px solid var(--line);border-radius:5px;padding:0 6px;font-family:inherit" oninput="edApplyDirLabels()">
-          <span style="color:var(--text2);font-weight:600">↓ 하</span>
-          <input type="text" id="edDirBottom" maxlength="12" placeholder="예: 하천" style="height:24px;font-size:11px;border:1.5px solid var(--line);border-radius:5px;padding:0 6px;font-family:inherit" oninput="edApplyDirLabels()">
-          <span style="color:var(--text2);font-weight:600">← 좌</span>
-          <input type="text" id="edDirLeft" maxlength="12" placeholder="예: 광장" style="height:24px;font-size:11px;border:1.5px solid var(--line);border-radius:5px;padding:0 6px;font-family:inherit" oninput="edApplyDirLabels()">
-          <span style="color:var(--text2);font-weight:600">→ 우</span>
-          <input type="text" id="edDirRight" maxlength="12" placeholder="예: 주차장" style="height:24px;font-size:11px;border:1.5px solid var(--line);border-radius:5px;padding:0 6px;font-family:inherit" oninput="edApplyDirLabels()">
-        </div>
-      </div>
-
       <div class="ed-sidebar-foot">
         <div class="ed-hint" style="padding:5px 8px;font-size:10px">목록에서 호수 선택 후 평면도를 클릭해 위치 지정</div>
         <div style="display:flex;gap:4px">
@@ -731,6 +725,11 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
 
     <!-- Canvas -->
     <div class="ed-canvas-area" id="edCanvasArea">
+      <!-- 방향 설명 버튼 (평면도 외곽) -->
+      <button class="ed-dir-btn ed-dir-top" id="edDirBtn-top" onclick="edShowDirInput('top')" title="상단 방향 설명">↑</button>
+      <button class="ed-dir-btn ed-dir-bottom" id="edDirBtn-bottom" onclick="edShowDirInput('bottom')" title="하단 방향 설명">↓</button>
+      <button class="ed-dir-btn ed-dir-left" id="edDirBtn-left" onclick="edShowDirInput('left')" title="좌측 방향 설명">←</button>
+      <button class="ed-dir-btn ed-dir-right" id="edDirBtn-right" onclick="edShowDirInput('right')" title="우측 방향 설명">→</button>
       <label class="img-dropzone" id="edDropzone">
         <div style="font-size:40px">🗺️</div>
         <div style="font-weight:600;font-size:14px">평면도 이미지를 드래그하거나 클릭해서 업로드</div>
@@ -2557,10 +2556,6 @@ function edLoadGroup(bName, gName) {
 
   // 방향 라벨 복원
   edDirLabels = Object.assign({ top:'', bottom:'', left:'', right:'' }, saved.dirLabels || {});
-  ['top','bottom','left','right'].forEach(s => {
-    const el = document.getElementById('edDir' + s.charAt(0).toUpperCase() + s.slice(1));
-    if (el) el.value = edDirLabels[s] || '';
-  });
   edApplyDirLabels();
 
   edActiveDong = '전체';
@@ -3122,10 +3117,6 @@ function edRotateImage(dir) {
   } else {
     edDirLabels = { top: dl.right, left: dl.top, bottom: dl.left, right: dl.bottom };
   }
-  ['top','bottom','left','right'].forEach(s => {
-    const el = document.getElementById('edDir' + s.charAt(0).toUpperCase() + s.slice(1));
-    if (el) el.value = edDirLabels[s] || '';
-  });
 
   const dataURL = cvs.toDataURL('image/webp', 0.95);
   edImageURL = dataURL;
@@ -3139,14 +3130,23 @@ function edRotateImage(dir) {
 
 // ── 방향 설명 라벨 ──
 let edDirLabels = { top: '', bottom: '', left: '', right: '' };
+
+function edShowDirInput(dir) {
+  const label = { top: '상단', bottom: '하단', left: '좌측', right: '우측' }[dir];
+  const current = edDirLabels[dir] || '';
+  const input = prompt(`📍 ${label} 방향 설명을 입력하세요 (예: 도로, 하천, 광장 등):`, current);
+
+  if (input !== null) {
+    edDirLabels[dir] = input.trim();
+    edApplyDirLabels();
+  }
+}
+
 function edApplyDirLabels() {
-  ['top','bottom','left','right'].forEach(s => {
-    const inp = document.getElementById('edDir' + s.charAt(0).toUpperCase() + s.slice(1));
-    if (inp) edDirLabels[s] = inp.value;
-  });
   const wrap = document.getElementById('edCanvasWrapper');
   if (!wrap) return;
   wrap.querySelectorAll('.ed-dir-label').forEach(el => el.remove());
+
   ['top','bottom','left','right'].forEach(s => {
     const txt = (edDirLabels[s] || '').trim();
     if (!txt) return;
@@ -3154,6 +3154,22 @@ function edApplyDirLabels() {
     el.className = 'ed-dir-label ' + s;
     el.textContent = txt;
     wrap.appendChild(el);
+  });
+
+  // 버튼에 현재 값 표시
+  ['top','bottom','left','right'].forEach(s => {
+    const btn = document.getElementById('edDirBtn-' + s);
+    if (btn && edDirLabels[s]) {
+      btn.dataset.text = edDirLabels[s];
+      btn.style.background = '#dbeafe';
+      btn.style.borderColor = '#3b82f6';
+      btn.style.color = '#3b82f6';
+    } else if (btn) {
+      delete btn.dataset.text;
+      btn.style.background = '#fff';
+      btn.style.borderColor = '#9ca3af';
+      btn.style.color = '#6b7280';
+    }
   });
 }
 
