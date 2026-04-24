@@ -1485,7 +1485,7 @@ function buildFloorplanView(bName, fp) {
       if(b.rot) box.style.transform=`rotate(${b.rot}deg)`;
       // 박스 너비(%)를 실제 픽셀로 변환 후 폰트 크기 계산
       const boxWidthPx = cW * (b.w / 100);
-      const fName = Math.max(10, Math.min(36, boxWidthPx * 0.15)); // 박스 너비의 15% ± 클램핑(10-36px)
+      const fName = Math.max(6, Math.min(96, boxWidthPx * 0.15)); // 박스 너비의 15% ± 클램핑(6-96px)
       const ta = b.textAlign || 'left';
       // 동+호수로 정확 매칭 (하위호환: dong/hosu 없으면 key를 호수로 사용)
       const ho = b.hosu || key;
@@ -1779,7 +1779,7 @@ function openFloorplanFullscreen(bName, fp) {
       if (b.rot) box.style.transform = `rotate(${b.rot}deg)`;
       // 박스 너비(%)를 실제 픽셀로 변환 후 폰트 크기 계산
       const boxWidthPx = dispW * (b.w / 100);
-      const fName = Math.max(10, Math.min(36, boxWidthPx * 0.15)); // 박스 너비의 15% ± 클램핑(10-36px)
+      const fName = Math.max(6, Math.min(96, boxWidthPx * 0.15)); // 박스 너비의 15% ± 클램핑(6-96px)
       const ta = b.textAlign || 'left';
       const ho = b.hosu || key;
       const dong = b.dong || '';
