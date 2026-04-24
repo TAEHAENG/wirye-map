@@ -353,6 +353,14 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
 .ed-dir-btn[data-text]:after{content:attr(data-text);position:absolute;top:-24px;left:50%;transform:translateX(-50%);background:#1f2937;color:#fff;padding:4px 8px;border-radius:4px;font-size:9px;font-weight:normal;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity 0.2s}
 .ed-dir-btn:hover[data-text]:after{opacity:1}
 
+/* 연결선 모드 */
+#edLinkSVG{position:absolute;top:0;left:0;z-index:45}
+.ed-link-point{position:absolute;width:10px;height:10px;border-radius:50%;border:2px solid #8b5cf6;background:transparent;cursor:pointer;z-index:52;transition:all 0.15s;display:none}
+.ed-link-point:hover{background:#8b5cf6;box-shadow:0 0 6px rgba(139,92,246,0.5)}
+.obox.ed-link-mode-active .ed-link-point{display:block}
+.obox.ed-link-mode-selected{outline:3px solid #8b5cf6;outline-offset:-3px}
+.ed-link-point.selected{background:#8b5cf6;box-shadow:0 0 8px rgba(139,92,246,0.8)}
+
 /* Floor plan drop zone */
 .img-dropzone{border:2px dashed var(--line2);border-radius:10px;min-height:300px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:all .2s;background:var(--paper);font-size:13px;color:var(--text2);position:relative;margin:40px}
 .img-dropzone:hover,.img-dropzone.drag{border-color:var(--blue);background:var(--blue-light);color:var(--blue)}
@@ -632,6 +640,7 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
           <div class="editor-sidebar-title">호실 목록</div>
           <span class="placed-pill" id="edPlacedPill">0 / 0</span>
         </div>
+        <button class="btn" id="edLinkModeBtn" onclick="edToggleLinkMode()" style="font-size:10px;padding:0 8px;height:26px;width:100%;margin-bottom:4px">🔗 OFF - 연결선 모드</button>
         <input class="topbar-search" style="max-width:none;height:26px;font-size:11px" placeholder="호수 또는 상호명 검색…" id="edUnitSearch" oninput="edRenderUnitList()">
       </div>
       <div class="ed-dong-tabs" id="edDongTabs"></div>
@@ -2114,6 +2123,174 @@ let edGroupNameVal = '';
 
 // 카드 표시 비율 (기본 100%)
 let edCardDisplayScale = 100;
+
+// ═══════════════════════════════════════════════
+// 연결선 모드 (동일 상호명 다중호수 연결)
+// ═══════════════════════════════════════════════
+let edLinkMode = false;
+let edLinkConnections = {}; // { groupKey: [points...] }
+
+function edToggleLinkMode() {
+  edLinkMode = !edLinkMode;
+  const btn = document.getElementById('edLinkModeBtn');
+  btn.textContent = edLinkMode ? '🔗 ON - 연결선 모드' : '🔗 OFF - 연결선 모드';
+  btn.classList.toggle('primary', edLinkMode);
+
+  if (edLinkMode) {
+    edRenderAllBoxes(); // 연결 포인트 표시
+    edDrawLinks(); // 기존 연결선 표시
+  } else {
+    edRenderAllBoxes(); // 포인트 숨김
+    const svg = document.getElementById('edLinkSVG');
+    if (svg) svg.remove();
+  }
+}
+
+function edRenderAllBoxes() {
+  const wr = document.getElementById('edCanvasWrapper');
+  wr.querySelectorAll('.obox').forEach(el=>el.remove());
+  // 캔버스 너비 기반 폰트 크기 계산
+  const canvasW = edImgNW * edZoom;
+  const displayScale = (edCardDisplayScale || 100) / 100;
+  const effectiveW = canvasW * displayScale;
+
+  // 동일 상호명 그룹 파악 (연결선 모드)
+  const nameGroups = {};
+  if (edLinkMode) {
+    for (const [bkey,b] of Object.entries(edBoxes)) {
+      const name = b.unit?.상호명 || b.name || '미지정';
+      if (!nameGroups[name]) nameGroups[name] = [];
+      nameGroups[name].push(bkey);
+    }
+  }
+
+  for (const [bkey,b] of Object.entries(edBoxes)) {
+    const el = document.createElement('div');
+    const selKey = edSelectedUnit ? edBoxKey(edSelectedUnit) : '';
+    const name = b.unit?.상호명 || b.name || b.unit?.호수 || bkey;
+    const isGroupMember = edLinkMode && nameGroups[name] && nameGroups[name].length > 1;
+
+    el.className = 'obox'+(selKey===bkey?' obox-selected':'');
+    if (edLinkMode && isGroupMember) el.classList.add('ed-link-mode-active');
+
+    el.dataset.bkey = bkey;
+    el.style.left=b.x+'%'; el.style.top=b.y+'%'; el.style.width=b.w+'%'; el.style.height=b.h+'%';
+    if (b.rot) el.style.transform = `rotate(${b.rot}deg)`;
+    const ta = b.textAlign || 'left';
+    const rotDeg = b.rot || 0;
+    const displayName = b.unit?.상호명 || b.name || b.unit?.호수 || bkey;
+    // 박스 너비 기반 폰트 크기 (전체지도와 동일한 로직)
+    const boxWidthPx = effectiveW * (b.w / 100);
+    const fName = Math.max(6, Math.min(96, boxWidthPx * 0.15));
+
+    let linkPointsHTML = '';
+    if (edLinkMode && isGroupMember) {
+      linkPointsHTML = `
+        <div class="ed-link-point" style="top:-5px;left:50%;transform:translateX(-50%)" onclick="edSelectLinkPoint(event,'${bkey}','top')" title="상단 연결"></div>
+        <div class="ed-link-point" style="bottom:-5px;left:50%;transform:translateX(-50%)" onclick="edSelectLinkPoint(event,'${bkey}','bottom')" title="하단 연결"></div>
+        <div class="ed-link-point" style="left:-5px;top:50%;transform:translateY(-50%)" onclick="edSelectLinkPoint(event,'${bkey}','left')" title="좌측 연결"></div>
+        <div class="ed-link-point" style="right:-5px;top:50%;transform:translateY(-50%)" onclick="edSelectLinkPoint(event,'${bkey}','right')" title="우측 연결"></div>
+      `;
+    }
+
+    el.innerHTML = `<div class="obox-hosu">${b.unit?.호수||bkey}</div><div class="obox-name" style="text-align:${ta};font-size:${fName}px">${displayName}</div><div class="obox-del">✕</div><div class="obox-rotate-label">${rotDeg}°</div><div class="obox-rotate" title="드래그하여 회전">↻</div><div class="obox-resize"></div>${linkPointsHTML}`;
+    el.querySelector('.obox-del').addEventListener('click',ev=>{ev.stopPropagation();delete edBoxes[bkey];edRenderAllBoxes();edRenderUnitList();});
+    el.querySelector('.obox-rotate').addEventListener('mousedown',edStartRotate);
+    el.addEventListener('mousedown',edStartDrag);
+    el.querySelector('.obox-resize').addEventListener('mousedown',edStartResize);
+    wr.appendChild(el);
+  }
+}
+
+function edSelectLinkPoint(e, bkey, side) {
+  e.stopPropagation();
+  const name = edBoxes[bkey].unit?.상호명 || edBoxes[bkey].name || '미지정';
+  if (!edLinkConnections[name]) edLinkConnections[name] = {};
+
+  edLinkConnections[name][bkey] = side;
+
+  // UI 반영
+  document.querySelectorAll('.obox.ed-link-mode-active').forEach(box => {
+    const key = box.dataset.bkey;
+    if (edLinkConnections[name][key]) {
+      box.classList.add('ed-link-mode-selected');
+    }
+  });
+
+  edDrawLinks();
+  showToast(`✓ ${name} - ${bkey} (${side})`);
+}
+
+function edDrawLinks() {
+  const wr = document.getElementById('edCanvasWrapper');
+  const existingSVG = document.getElementById('edLinkSVG');
+  if (existingSVG) existingSVG.remove();
+
+  if (!edLinkMode) return;
+
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.id = 'edLinkSVG';
+  svg.style.width = '100%';
+  svg.style.height = '100%';
+
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+
+  // 각 상호명 그룹별로 연결선 그리기
+  for (const [name, connections] of Object.entries(edLinkConnections)) {
+    const points = [];
+    for (const [bkey, side] of Object.entries(connections)) {
+      const box = wr.querySelector(`[data-bkey="${bkey}"]`);
+      if (!box) continue;
+
+      const rect = box.getBoundingClientRect();
+      const wrapRect = wr.getBoundingClientRect();
+
+      let x, y;
+      const centerX = rect.left - wrapRect.left + rect.width / 2;
+      const centerY = rect.top - wrapRect.top + rect.height / 2;
+
+      if (side === 'top') { x = centerX; y = rect.top - wrapRect.top; }
+      else if (side === 'bottom') { x = centerX; y = rect.bottom - wrapRect.top; }
+      else if (side === 'left') { x = rect.left - wrapRect.left; y = centerY; }
+      else if (side === 'right') { x = rect.right - wrapRect.left; y = centerY; }
+
+      points.push({ x, y, bkey });
+    }
+
+    // 포인트들을 순서대로 연결
+    if (points.length > 1) {
+      for (let i = 0; i < points.length - 1; i++) {
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', points[i].x);
+        line.setAttribute('y1', points[i].y);
+        line.setAttribute('x2', points[i+1].x);
+        line.setAttribute('y2', points[i+1].y);
+        line.setAttribute('stroke', '#8b5cf6');
+        line.setAttribute('stroke-width', '3');
+        line.setAttribute('stroke-linecap', 'round');
+        g.appendChild(line);
+
+        // 결절점(원)
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', points[i].x);
+        circle.setAttribute('cy', points[i].y);
+        circle.setAttribute('r', '5');
+        circle.setAttribute('fill', '#8b5cf6');
+        g.appendChild(circle);
+      }
+      // 마지막 결절점
+      const lastCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      lastCircle.setAttribute('cx', points[points.length-1].x);
+      lastCircle.setAttribute('cy', points[points.length-1].y);
+      lastCircle.setAttribute('r', '5');
+      lastCircle.setAttribute('fill', '#8b5cf6');
+      g.appendChild(lastCircle);
+    }
+  }
+
+  svg.appendChild(g);
+  wr.appendChild(svg);
+}
 
 // ── 카드 표시 비율 조정 ──
 function edUpdateCardDisplayScale(val) {
