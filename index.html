@@ -2209,13 +2209,26 @@ function edSelectLinkPoint(e, bkey, side) {
 
   edLinkConnections[name][bkey] = side;
 
-  // UI 반영
+  // 선택된 박스만 강조, 나머지는 결절점만 표시
+  const wr = document.getElementById('edCanvasWrapper');
   document.querySelectorAll('.obox.ed-link-mode-active').forEach(box => {
     const key = box.dataset.bkey;
-    if (edLinkConnections[name][key]) {
-      box.classList.add('ed-link-mode-selected');
-    }
+    box.classList.remove('ed-link-mode-selected');
+    const nameText = box.querySelector('.obox-name');
+    const hosuText = box.querySelector('.obox-hosu');
+    if (nameText) nameText.style.display = 'none';
+    if (hosuText) hosuText.style.display = 'none';
   });
+
+  // 선택된 박스만 텍스트 노출
+  const selectedBox = wr.querySelector(`[data-bkey="${bkey}"]`);
+  if (selectedBox) {
+    selectedBox.classList.add('ed-link-mode-selected');
+    const nameText = selectedBox.querySelector('.obox-name');
+    const hosuText = selectedBox.querySelector('.obox-hosu');
+    if (nameText) nameText.style.display = 'block';
+    if (hosuText) hosuText.style.display = 'block';
+  }
 
   edDrawLinks();
   showToast(`✓ ${name} - ${bkey} (${side})`);
