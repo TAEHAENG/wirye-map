@@ -516,6 +516,7 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
   <div class="topbar-actions" id="mapActions">
     <button class="filter-toggle" id="adminModeBtn" title="관리자 모드 ON 시 소유자/상담내용 표시" onclick="toggleAdminMode()">🔒 관리자</button>
     <button class="btn primary" id="addBldgBtn" title="DB에서 건물을 골라 지도에 추가합니다" onclick="openAddBuildingPopup()" style="font-size:11px">＋ 건물 추가</button>
+    <button class="btn" id="activeBldgsBtn" title="지도에 표시 중인 건물을 관리합니다 (X로 제거 가능)" onclick="openActiveBuildingsMenu(event)" style="font-size:11px;position:relative">📍 <span id="activeBldgsCount" style="font-size:10px;font-weight:700">0</span></button>
     <button class="filter-toggle" id="mapBgBtn" title="배경에 OSM 지도를 표시/숨김합니다" onclick="toggleMapBg()">🗺️ 지도</button>
     <button class="filter-toggle" id="vacantFilter" title="공실만 보기">공실만</button>
     <button class="btn" id="resetLayout" title="배치 초기화">↻ 초기화</button>
@@ -740,6 +741,8 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
       <div class="ed-canvas-scroller" id="edCanvasScroller" style="display:none">
         <div class="ed-canvas-wrapper" id="edCanvasWrapper">
           <img id="ed-floorplan-img" src="" alt="평면도" draggable="false">
+          <!-- 전체지도 카드 테두리 미리보기 -->
+          <div id="edCardBorder" style="display:none;position:absolute;border:2px dashed #93c5fd;pointer-events:none;background:rgba(37,99,235,0.05);top:0;left:0;box-shadow:inset 0 0 0 1px #2563eb;z-index:5"></div>
           <!-- 열 정렬 가이드라인 (JS로 추가됨) -->
         </div>
       </div>
@@ -1160,6 +1163,10 @@ function renderAllCards() {
     canvas.appendChild(empty);
   }
 
+  // 활성 건물 개수 배지 업데이트
+  const badge = document.getElementById('activeBldgsCount');
+  if (badge) badge.textContent = toRender.length;
+
   updateStats();
 }
 
@@ -1228,6 +1235,57 @@ function openAddBuildingPopup() {
   if (searchEl) {
     searchEl.addEventListener('input', e => renderList(e.target.value));
     setTimeout(() => searchEl.focus(), 30);
+  }
+
+  // 바깥 클릭 시 닫기
+  setTimeout(() => {
+    const closer = (ev) => {
+      if (!pop.contains(ev.target) && ev.target !== anchor) {
+        pop.remove();
+        document.removeEventListener('mousedown', closer);
+      }
+    };
+    document.addEventListener('mousedown', closer);
+  }, 0);
+}
+
+// 지도에 표시 중인 건물 목록 및 관리 메뉴
+function openActiveBuildingsMenu(event) {
+  event.stopPropagation();
+  const existing = document.getElementById('activeBldgsPopup');
+  if (existing) { existing.remove(); return; }
+  const anchor = document.getElementById('activeBldgsBtn');
+  if (!anchor) return;
+  const rect = anchor.getBoundingClientRect();
+
+  const pop = document.createElement('div');
+  pop.id = 'activeBldgsPopup';
+  pop.style.cssText = `position:fixed;top:${rect.bottom + 6}px;right:${window.innerWidth - rect.right}px;width:240px;max-height:70vh;background:#fff;border:1.5px solid #e5e7eb;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.15);z-index:9000;display:flex;flex-direction:column;overflow:hidden;font-size:12px`;
+
+  const active = [...activeBuildings].sort();
+
+  pop.innerHTML = `
+    <div style="padding:10px 12px;border-bottom:1px solid #eef2f7;font-weight:600;color:#1f2937">
+      📍 지도에 표시 중 (${active.length})
+    </div>
+    <div id="activeBldgsList" style="overflow:auto;max-height:calc(70vh - 46px);padding:4px"></div>
+    ${active.length === 0 ? '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:11px">표시 중인 건물이 없습니다</div>' : ''}
+  `;
+
+  document.body.appendChild(pop);
+
+  const list = document.getElementById('activeBldgsList');
+  if (list) {
+    list.innerHTML = active.map(b => {
+      const cnt = Object.values(buildings[b]||{}).reduce((a,d)=>a+Object.values(d).reduce((x,rs)=>x+rs.length,0),0);
+      return `<div style="display:flex;align-items:center;gap:8px;padding:8px 8px;border-radius:6px;border-bottom:1px solid #f3f4f6;cursor:pointer;transition:background .12s" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='transparent'">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:500;color:#1f2937;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(b)}</div>
+          <div style="font-size:10px;color:#9ca3af">${cnt}개 호실</div>
+        </div>
+        <button class="btn" title="지도에서 제거" onclick="event.stopPropagation();removeBuildingFromMap('${escHtml(b).replace(/'/g,"\\'")}');document.getElementById('activeBldgsPopup')?.remove();openActiveBuildingsMenu({stopPropagation:()=>{}})" style="padding:0 6px;height:24px;font-size:10px;color:#dc2626;border-color:#fecaca;background:#fee2e2">✕</button>
+      </div>`;
+    }).join('');
   }
 
   // 바깥 클릭 시 닫기
@@ -3274,7 +3332,23 @@ function edStartRotate(e) {
 
 // ── Zoom ──
 function edChangeZoom(d){edZoom=Math.max(.2,Math.min(5,edZoom+d));edApplyZoom();}
-function edApplyZoom(){const img=document.getElementById('ed-floorplan-img');const scaledZoom=edZoom*edImageScale;img.style.width=(edImgNW*scaledZoom)+'px';img.style.height=(edImgNH*scaledZoom)+'px';document.getElementById('edZoomVal').textContent=Math.round(edZoom*100)+'%';}
+function edApplyZoom(){
+  const img=document.getElementById('ed-floorplan-img');
+  const scaledZoom=edZoom*edImageScale;
+  img.style.width=(edImgNW*scaledZoom)+'px';
+  img.style.height=(edImgNH*scaledZoom)+'px';
+  document.getElementById('edZoomVal').textContent=Math.round(edZoom*100)+'%';
+  // 카드 테두리 미리보기 계산 및 표시
+  const ratio = edImgNW / edImgNH;
+  let cardW = 640;
+  if (ratio > 1.3) cardW = Math.min(1920, Math.round(640 * ratio));
+  else if (ratio < 0.6) cardW = Math.max(400, Math.round(640 * ratio * 1.2));
+  const cardH = Math.round(cardW / ratio);
+  const cardBorder = document.getElementById('edCardBorder');
+  cardBorder.style.width = (cardW * scaledZoom) + 'px';
+  cardBorder.style.height = (cardH * scaledZoom) + 'px';
+  cardBorder.style.display = edImgNW > 0 ? 'block' : 'none';
+}
 function edClearAllBoxes(){if(!confirm('모든 박스를 초기화할까요?'))return;edBoxes={};edRenderAllBoxes();edRenderUnitList();}
 
 // 이 그룹(층) 초기화 — 현재 선택된 그룹의 배치+이미지만 삭제
