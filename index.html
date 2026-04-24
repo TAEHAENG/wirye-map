@@ -150,7 +150,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 
 /* ══ EDITOR PAGE ══ */
 .editor-layout{flex:1;display:flex;overflow:hidden}
-.editor-sidebar{width:320px;min-width:320px;background:var(--paper2);border-right:1.5px solid var(--line);display:flex;flex-direction:column;overflow:hidden}
+.editor-sidebar{width:320px;background:var(--paper2);border-right:1.5px solid var(--line);display:flex;flex-direction:column;overflow:hidden;position:relative}
+.editor-sidebar-resizer{width:6px;background:transparent;cursor:col-resize;border-left:1px solid var(--line);border-right:1px solid var(--line);transition:background 0.15s;flex-shrink:0}
+.editor-sidebar-resizer:hover{background:#d1d5db}
 .editor-sidebar-top{padding:6px 12px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:4px}
 .editor-sidebar-title{font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.5px;text-transform:uppercase}
 
@@ -583,7 +585,7 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
 <div class="page-view" id="page-editor">
   <div class="editor-layout">
     <!-- Sidebar -->
-    <div class="editor-sidebar">
+    <div class="editor-sidebar" id="editorSidebar">
       <div class="editor-sidebar-top">
         <div class="sheet-status" id="edSheetStatus" style="font-size:10px;padding:3px 8px">시트 연결 중...</div>
         <div class="building-selector">
@@ -626,6 +628,17 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
         <div style="font-size:10px;color:var(--text2);padding:2px 2px 4px;font-weight:600">그룹(층) 선택</div>
         <div id="edSheetGroupTabs" class="ed-dong-tabs" style="border-bottom:none;padding:0 2px 4px"></div>
         <div style="font-size:9px;color:var(--text3);padding:0 2px">스프레드시트 '그룹' 열 기준 자동 분류. 그룹 탭 선택 → 이미지 업로드 → 호실 배치</div>
+      </div>
+
+      <!-- 카드 표시 설정 -->
+      <div class="ed-place-cfg" id="edCardDisplayCfg">
+        <div style="font-size:10px;color:var(--text2);padding:2px 2px 4px;font-weight:600">전체지도 카드 표시</div>
+        <div class="ed-place-cfg-row">
+          <span class="ed-place-cfg-label" style="min-width:50px">표시 비율</span>
+          <input type="range" id="edCardDisplayScale" min="30" max="200" value="100" step="10" style="flex:1;cursor:pointer" oninput="edUpdateCardDisplayScale(this.value)">
+          <span id="edCardDisplayScaleVal" style="font-size:10px;min-width:32px;text-align:right;font-family:'IBM Plex Mono',monospace">100%</span>
+        </div>
+        <div style="font-size:9px;color:var(--text3);padding:0 2px">평면도가 카드 영역에서 표시되는 크기 조정 (30~200%)</div>
       </div>
       <!-- 상호명 상자 설정 모드 -->
       <div class="ed-place-cfg" id="edBoxModeCfg">
@@ -712,6 +725,9 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
         </div>
       </div>
     </div>
+
+    <!-- Resizer -->
+    <div class="editor-sidebar-resizer" id="editorResizer"></div>
 
     <!-- Canvas -->
     <div class="ed-canvas-area" id="edCanvasArea">
@@ -919,7 +935,53 @@ function switchPage(page) {
   document.getElementById('mapSearchWrap').style.display = page === 'map' ? '' : 'none';
   document.getElementById('mapActions').style.display = page === 'map' ? '' : 'none';
   // 편집 페이지 진입 시 저장공간 표시 갱신 (브라우저 즉시, 클라우드는 캐시 사용)
-  if (page === 'editor') refreshAllStorageStats(false);
+  if (page === 'editor') {
+    refreshAllStorageStats(false);
+    initEditorResizer();
+  }
+}
+
+// ═══════════════════════════════════════════════
+// EDITOR PANEL RESIZER
+// ═══════════════════════════════════════════════
+let edResizerActive = false;
+function initEditorResizer() {
+  const sidebar = document.getElementById('editorSidebar');
+  const resizer = document.getElementById('editorResizer');
+  const layout = document.querySelector('.editor-layout');
+
+  if (!sidebar || !resizer || !layout) return;
+
+  // 저장된 너비 복원
+  const savedWidth = localStorage.getItem('editorSidebarWidth');
+  if (savedWidth) {
+    sidebar.style.width = savedWidth + 'px';
+    sidebar.style.minWidth = '0';
+  }
+
+  resizer.addEventListener('mousedown', (e) => {
+    edResizerActive = true;
+    const startX = e.clientX;
+    const startWidth = sidebar.offsetWidth;
+
+    const onMove = (ev) => {
+      if (!edResizerActive) return;
+      const delta = ev.clientX - startX;
+      const newWidth = Math.max(200, Math.min(700, startWidth + delta));
+      sidebar.style.width = newWidth + 'px';
+      sidebar.style.minWidth = '0';
+    };
+
+    const onUp = () => {
+      edResizerActive = false;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      localStorage.setItem('editorSidebarWidth', sidebar.offsetWidth);
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
 }
 
 // ═══════════════════════════════════════════════
@@ -1433,9 +1495,14 @@ function buildFloorplanView(bName, fp) {
 
   // 이미지 로드 후: 이미지 비율에 맞춰 카드 폭 조절 + 글씨 크기 계산
   const renderBoxes = () => {
+    // 카드 표시 비율 적용
+    const displayScale = (fp.cardDisplayScale || 100) / 100;
+    const natW = (img.naturalWidth || 1) * displayScale, natH = (img.naturalHeight || 1) * displayScale;
+    img.style.width = natW + 'px';
+    img.style.height = natH + 'px';
     // 이미지 비율에 따라 카드 폭 자동 조절 (사용자가 수동으로 크기 설정한 경우 건너뜀)
-    const natW = img.naturalWidth || 1, natH = img.naturalHeight || 1;
-    const ratio = natW / natH;
+    const origW = img.naturalWidth || 1, origH = img.naturalHeight || 1;
+    const ratio = origW / origH;
     const card = container.closest('.building-card');
     const cid = card?.id;
     const userSized = cid && positions[cid]?.w;
@@ -2037,6 +2104,20 @@ let edSavedAxis = null; // { xOn, xPos, xAnchor, yOn, yPos, yAnchor, rot }
 // 그룹명(층명) 상태
 let edGroupNameVal = '';
 
+// 카드 표시 비율 (기본 100%)
+let edCardDisplayScale = 100;
+
+// ── 카드 표시 비율 조정 ──
+function edUpdateCardDisplayScale(val) {
+  edCardDisplayScale = parseInt(val);
+  document.getElementById('edCardDisplayScaleVal').textContent = edCardDisplayScale + '%';
+  // 현재 그룹 데이터에 저장
+  if (edGroupNameVal && positions[edCurrentBuildingId + '_' + edGroupNameVal]) {
+    positions[edCurrentBuildingId + '_' + edGroupNameVal].cardDisplayScale = edCardDisplayScale;
+  }
+  edSaveToMap(); // 즉시 반영
+}
+
 // ── 상자 설정 모드 토글 ──
 function edToggleBoxMode() {
   edBoxMode = !edBoxMode;
@@ -2197,6 +2278,7 @@ function edSelectSheetGroup(bName, gName) {
     // 새 그룹 — 이미지 없음
     edBoxes = {};
     edImageURL = '';
+    edCardDisplayScale = 100; // 초기값 설정
     document.getElementById('ed-floorplan-img').src = '';
     document.getElementById('edDropzone').classList.remove('has-file');
     document.getElementById('edCanvasScroller').style.display = 'none';
@@ -2407,6 +2489,14 @@ function edLoadGroup(bName, gName) {
       wrapper.style.width = pos.cardWidth + 'px';
       wrapper.style.height = pos.cardHeight + 'px';
     }
+  }
+  // 카드 표시 비율 복원
+  edCardDisplayScale = pos?.cardDisplayScale || 100;
+  const scaleSlider = document.getElementById('edCardDisplayScale');
+  const scaleVal = document.getElementById('edCardDisplayScaleVal');
+  if (scaleSlider) {
+    scaleSlider.value = edCardDisplayScale;
+    scaleVal.textContent = edCardDisplayScale + '%';
   }
 
   // 이미지 복원
@@ -3273,13 +3363,18 @@ function edSaveToMap(){
 
   function doSave(imgDataURL) {
     if (!floorplans[bName]) floorplans[bName] = {};
+    const cardId = 'card_' + btoa(encodeURIComponent(bName)).replace(/[^a-zA-Z0-9]/g, '_');
     floorplans[bName][gName] = {
       boxes: boxData,
       groupName: gName,
       imgDataURL,
       dirLabels: { ...edDirLabels },
+      cardDisplayScale: edCardDisplayScale,
       savedAt: new Date().toISOString()
     };
+    // 위치 데이터에도 저장
+    if (!positions[cardId]) positions[cardId] = { x: 0, y: 0 };
+    positions[cardId].cardDisplayScale = edCardDisplayScale;
     // 평면도를 저장했다면 전체지도에도 자동 추가
     if (!activeBuildings.has(bName)) {
       activeBuildings.add(bName);
