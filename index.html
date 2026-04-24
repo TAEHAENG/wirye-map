@@ -605,6 +605,12 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
           </div>
         </div>
         <span id="edImgName" style="font-size:10px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+        <!-- 이미지 스케일 조절 (전체지도 대비 이미지 크기) -->
+        <div style="font-size:10px;color:var(--text2);padding:6px 8px 2px;font-weight:600">이미지 크기</div>
+        <div style="display:flex;gap:6px;padding:0 8px 4px;align-items:center">
+          <input type="range" id="edImageScaleSlider" min="50" max="200" value="100" step="10" oninput="edSetImageScale(this.value)" title="전체지도 대비 이미지 배율" style="flex:1;height:18px;cursor:pointer">
+          <span id="edImageScaleLabel" style="font-size:10px;color:var(--text3);min-width:35px;text-align:right">100%</span>
+        </div>
         <div id="edStorageStat" style="font-size:10px;color:var(--text3);padding:3px 8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;line-height:1.5;border-top:1px dashed var(--line);margin-top:4px">
           <span id="edStorageLocal" title="브라우저 localStorage 사용량 (용량 초과 시 이미지 저장 경고 원인)">💾 브라우저 —</span>
           <span id="edStorageCloud" title="Supabase 클라우드 저장소 사용량 (동기화 시 갱신)" style="cursor:pointer" onclick="refreshCloudUsage()">☁️ 클라우드 <span style="color:var(--blue);text-decoration:underline">새로고침</span></span>
@@ -674,27 +680,16 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
             <button class="btn" id="edPasteAxisBtn" onclick="edPasteAxis()" style="font-size:10px;padding:0 8px;height:24px" title="저장된 기준점으로 복원" disabled>📥 붙여넣기</button>
             <span id="edAxisSavedLabel" style="font-size:9px;color:var(--text3)"></span>
           </div>
-          <!-- 폰트 -->
+          <!-- 표시 필터 (프로세스 기준) — 향후 보증금/월세/유형 확장 예정 -->
           <div class="ed-place-cfg-row">
-            <span class="ed-place-cfg-label">폰트</span>
-            <select id="edFontFamilySelect" onchange="edSetFontFamily(this.value)" style="height:26px;font-size:11px;border:1.5px solid var(--line);border-radius:5px;padding:0 4px;font-family:inherit;flex:1">
-              <option value="Noto Sans KR">Noto Sans KR</option>
-              <option value="나눔고딕">나눔고딕</option>
-              <option value="맑은 고딕">맑은 고딕</option>
-              <option value="IBM Plex Mono">IBM Plex Mono</option>
-            </select>
-          </div>
-          <!-- 테두리 강조 -->
-          <div class="ed-place-cfg-row">
-            <span class="ed-place-cfg-label">테두리</span>
-            <button class="btn" id="edStrokeBtn" onclick="edToggleStroke()" style="font-size:10px;padding:0 8px;height:26px">OFF</button>
-            <input type="color" id="edStrokeColorPicker" value="#ffffff" title="테두리 색상" onchange="edSetStrokeColor(this.value)" style="width:32px;height:26px;border:1.5px solid var(--line);border-radius:5px;padding:2px;cursor:pointer">
-          </div>
-          <!-- 그림자 -->
-          <div class="ed-place-cfg-row">
-            <span class="ed-place-cfg-label">그림자</span>
-            <button class="btn" id="edShadowBtn" onclick="edToggleShadow()" style="font-size:10px;padding:0 8px;height:26px">ON</button>
-            <input type="color" id="edShadowColorPicker" value="#ffffff" title="그림자 색상" onchange="edSetShadowColor(this.value)" style="width:32px;height:26px;border:1.5px solid var(--line);border-radius:5px;padding:2px;cursor:pointer">
+            <span class="ed-place-cfg-label">표시</span>
+            <div class="ed-seg" id="edDisplayFilterSeg" style="flex-wrap:wrap;gap:2px">
+              <button class="ed-seg-btn active" id="edFilterSuggest" onclick="edSetDisplayFilter('suggest')" title="제안가능(등록)만 표시">제안</button>
+              <button class="ed-seg-btn" id="edFilterAll" onclick="edSetDisplayFilter('all')" title="공실 외 모두 표시">모두</button>
+              <button class="ed-seg-btn" id="edFilterVacant" onclick="edSetDisplayFilter('vacant')" title="공실만 표시">공실</button>
+              <button class="ed-seg-btn" id="edFilterExcludeVacant" onclick="edSetDisplayFilter('excludeVacant')" title="공실 제외">제외</button>
+            </div>
+            <span style="font-size:9px;color:var(--text3);width:100%;margin-top:3px">※ 향후 보증금·월세·유형 필터 추가 예정</span>
           </div>
         </div>
       </div>
@@ -1476,6 +1471,9 @@ function buildFloorplanView(bName, fp) {
     renderBoxes._tries = 0;
     container.querySelectorAll('.card-fp-box').forEach(el => el.remove());
     const scale = cW / natW;
+    // 이미지 스케일 적용 (편집기에서 설정한 비율로 이미지 확대/축소, 폰트는 표준 크기 유지)
+    const imgScale = Object.values(fp.boxes)[0]?.imageScale || 1.0;
+    img.style.width = (cW * imgScale) + 'px';
     // 편집기와 동일한 비율의 텍스트 크기 (14px 기준 — QHD 모니터에서 최적화, 9~26px 범위로 클램핑)
     const baseFontPx = 14;
     // 건물명 컬럼 자동 탐색
@@ -1497,15 +1495,23 @@ function buildFloorplanView(bName, fp) {
         return true;
       });
       const proc = room ? (room['프로세스']||'').trim() : '';
+      // 표시 필터 판별: displayFilter가 없으면 기본값('suggest')으로 간주
+      const dfilt = b.displayFilter || 'suggest';
+      const matchesFilter = (() => {
+        switch (dfilt) {
+          case 'suggest': return proc === '제안가능(등록)';
+          case 'all': return proc !== '' && proc !== '공실';
+          case 'vacant': return proc === '공실';
+          case 'excludeVacant': return proc !== '공실';
+          default: return true;
+        }
+      })();
+      // 필터에 매칭되지 않으면 박스 렌더링 건너뜀
+      if (!matchesFilter) continue;
       let colorCls = 'fp-color-default';
       if (proc === '공실') colorCls = 'fp-color-vacant';
       else if (proc === '제안가능(등록)') colorCls = 'fp-color-suggest';
-      const ff = b.fontFamily || 'Noto Sans KR';
-      const shadowOn = b.textShadow !== false;
-      const shadowColor = b.textShadowColor || '#ffffff';
-      const shadow = shadowOn ? `0 0 4px ${shadowColor},0 0 8px ${shadowColor}` : 'none';
-      const stroke = b.textStroke ? `-webkit-text-stroke:${b.textStrokeWidth||1}px ${b.textStrokeColor||'#fff'}` : '';
-      box.innerHTML = `<span class="fp-name ${colorCls}" style="font-size:${fName.toFixed(1)}px;text-align:${ta};font-family:'${ff}',sans-serif;text-shadow:${shadow};${stroke}">${b.name||ho}</span>`;
+      box.innerHTML = `<span class="fp-name ${colorCls}" style="font-size:${fName.toFixed(1)}px;text-align:${ta}">${b.name||ho}</span>`;
       box.style.pointerEvents = 'auto';
       box.style.cursor = 'pointer';
       box.dataset.hosu = ho;
@@ -1794,15 +1800,22 @@ function openFloorplanFullscreen(bName, fp) {
         return true;
       });
       const proc = room ? (room['프로세스']||'').trim() : '';
+      // 표시 필터 판별
+      const dfilt = b.displayFilter || 'suggest';
+      const matchesFilter = (() => {
+        switch (dfilt) {
+          case 'suggest': return proc === '제안가능(등록)';
+          case 'all': return proc !== '' && proc !== '공실';
+          case 'vacant': return proc === '공실';
+          case 'excludeVacant': return proc !== '공실';
+          default: return true;
+        }
+      })();
+      if (!matchesFilter) continue;
       let colorCls = 'fp-color-default';
       if (proc === '공실') colorCls = 'fp-color-vacant';
       else if (proc === '제안가능(등록)') colorCls = 'fp-color-suggest';
-      const ff = b.fontFamily || 'Noto Sans KR';
-      const shadowOn = b.textShadow !== false;
-      const shadowColor = b.textShadowColor || '#ffffff';
-      const shadow = shadowOn ? `0 0 4px ${shadowColor},0 0 8px ${shadowColor}` : 'none';
-      const stroke = b.textStroke ? `-webkit-text-stroke:${b.textStrokeWidth||1}px ${b.textStrokeColor||'#fff'}` : '';
-      box.innerHTML = `<span class="fp-name ${colorCls}" style="font-size:${fName.toFixed(1)}px;text-align:${ta};font-family:'${ff}',sans-serif;text-shadow:${shadow};${stroke}">${b.name||ho}</span>`;
+      box.innerHTML = `<span class="fp-name ${colorCls}" style="font-size:${fName.toFixed(1)}px;text-align:${ta}">${b.name||ho}</span>`;
       box.style.cursor = 'pointer';
       box.addEventListener('click', (ev) => {
         ev.stopPropagation();
@@ -2028,6 +2041,9 @@ let edZoom = 1.0;
 let edActiveDong = '전체';
 let edDragging = null, edResizing = null;
 
+// 편집기 이미지 크기 비율 (전체지도 대비)
+let edImageScale = 1.0; // 50% ~ 200% (0.5 ~ 2.0)
+
 // ── 상자 설정 모드 상태 ──
 let edBoxMode = false;        // 상자 설정 모드 ON/OFF
 let edAxisXOn = false;        // X축 정렬선 ON
@@ -2043,13 +2059,15 @@ let edTextAlignManual = false; // 사용자가 텍스트 정렬을 직접 지정
 // 저장된 축 기준점 — 다른 호실에서 복사해서 재사용 가능
 let edSavedAxis = null; // { xOn, xPos, xAnchor, yOn, yPos, yAnchor, rot }
 
-// 상호명 박스 텍스트 스타일
-let edFontFamily = 'Noto Sans KR';
-let edTextStroke = false;
-let edTextStrokeColor = '#ffffff';
-let edTextStrokeWidth = 1;
-let edTextShadow = true;   // 기본값 ON
-let edTextShadowColor = '#ffffff';
+// 상호명 박스 표시 필터 (프로세스 기준)
+// 'suggest': 제안가능(등록)만 (기본값)
+// 'all': 공실 외 모두
+// 'vacant': 공실만
+// 'excludeVacant': 공실 제외
+let edDisplayFilter = 'suggest';
+
+// 향후 필터 확장을 위한 필드 (보증금, 월세, 유형 등)
+let edFilterTags = []; // 예: ['매매', '5000~10000']
 
 // 그룹명(층명) 상태
 let edGroupNameVal = '';
@@ -2117,32 +2135,38 @@ function edSetTextAlign(align) {
   edApplyTextAlignUI(align);
 }
 
-// ── 상호명 박스 텍스트 스타일 설정 ──
-function edSetFontFamily(v) {
-  edFontFamily = v;
+// ── 이미지 스케일 설정 ──
+function edSetImageScale(val) {
+  edImageScale = Math.max(0.5, Math.min(2, parseFloat(val) || 1.0));
+  document.getElementById('edImageScaleLabel').textContent = Math.round(edImageScale * 100) + '%';
+  edApplyZoom(); // 즉시 미리보기 반영
+}
+
+// ── 상호명 박스 표시 필터 설정 ──
+function edSetDisplayFilter(filterType) {
+  edDisplayFilter = filterType;
+  // UI 동기화
+  document.querySelectorAll('#edDisplayFilterSeg .ed-seg-btn').forEach(btn => btn.classList.remove('active'));
+  const btnMap = {
+    'suggest': 'edFilterSuggest',
+    'all': 'edFilterAll',
+    'vacant': 'edFilterVacant',
+    'excludeVacant': 'edFilterExcludeVacant'
+  };
+  const btnId = btnMap[filterType];
+  if (btnId) document.getElementById(btnId).classList.add('active');
   edRenderAllBoxes();
 }
-function edToggleStroke() {
-  edTextStroke = !edTextStroke;
-  const btn = document.getElementById('edStrokeBtn');
-  btn.textContent = edTextStroke ? 'ON' : 'OFF';
-  btn.classList.toggle('primary', edTextStroke);
-  edRenderAllBoxes();
-}
-function edSetStrokeColor(v) {
-  edTextStrokeColor = v;
-  edRenderAllBoxes();
-}
-function edToggleShadow() {
-  edTextShadow = !edTextShadow;
-  const btn = document.getElementById('edShadowBtn');
-  btn.textContent = edTextShadow ? 'ON' : 'OFF';
-  btn.classList.toggle('primary', edTextShadow);
-  edRenderAllBoxes();
-}
-function edSetShadowColor(v) {
-  edTextShadowColor = v;
-  edRenderAllBoxes();
+// 필터 판별 헬퍼: 주어진 프로세스가 현재 필터에 일치하는지 판별
+function edMatchesDisplayFilter(processStr) {
+  const proc = (processStr || '').trim();
+  switch (edDisplayFilter) {
+    case 'suggest': return proc === '제안가능(등록)';
+    case 'all': return proc !== '' && proc !== '공실';
+    case 'vacant': return proc === '공실';
+    case 'excludeVacant': return proc !== '공실';
+    default: return true;
+  }
 }
 
 // ── 축 기준점 복사/붙여넣기 ──
@@ -3155,12 +3179,9 @@ function edOnCanvasClick(e) {
     x: bx, y: by, w: boxW, h: boxH, rot: rot,
     name: edSelectedUnit.상호명,
     textAlign: tAlign,
-    fontFamily: edFontFamily,
-    textStroke: edTextStroke,
-    textStrokeColor: edTextStrokeColor,
-    textStrokeWidth: edTextStrokeWidth,
-    textShadow: edTextShadow,
-    textShadowColor: edTextShadowColor,
+    displayFilter: edDisplayFilter,
+    filterTags: [...edFilterTags],
+    imageScale: edImageScale,
     unit: edSelectedUnit
   };
 
@@ -3186,12 +3207,7 @@ function edRenderAllBoxes() {
     const ta = b.textAlign || 'left';
     const rotDeg = b.rot || 0;
     const displayName = b.unit?.상호명 || b.name || b.unit?.호수 || bkey;
-    const ff = b.fontFamily || 'Noto Sans KR';
-    const shadowOn = b.textShadow !== false;
-    const shadowColor = b.textShadowColor || '#ffffff';
-    const shadow = shadowOn ? `0 0 3px ${shadowColor},0 0 3px ${shadowColor}` : 'none';
-    const stroke = b.textStroke ? `-webkit-text-stroke:${b.textStrokeWidth||1}px ${b.textStrokeColor||'#fff'}` : '';
-    el.innerHTML = `<div class="obox-hosu">${b.unit?.호수||bkey}</div><div class="obox-name" style="text-align:${ta};font-family:'${ff}',sans-serif;text-shadow:${shadow};${stroke}">${displayName}</div><div class="obox-del">✕</div><div class="obox-rotate-label">${rotDeg}°</div><div class="obox-rotate" title="드래그하여 회전">↻</div><div class="obox-resize"></div>`;
+    el.innerHTML = `<div class="obox-hosu">${b.unit?.호수||bkey}</div><div class="obox-name" style="text-align:${ta}">${displayName}</div><div class="obox-del">✕</div><div class="obox-rotate-label">${rotDeg}°</div><div class="obox-rotate" title="드래그하여 회전">↻</div><div class="obox-resize"></div>`;
     el.querySelector('.obox-del').addEventListener('click',ev=>{ev.stopPropagation();delete edBoxes[bkey];edRenderAllBoxes();edRenderUnitList();});
     el.querySelector('.obox-rotate').addEventListener('mousedown',edStartRotate);
     el.addEventListener('mousedown',edStartDrag);
@@ -3258,7 +3274,7 @@ function edStartRotate(e) {
 
 // ── Zoom ──
 function edChangeZoom(d){edZoom=Math.max(.2,Math.min(5,edZoom+d));edApplyZoom();}
-function edApplyZoom(){const img=document.getElementById('ed-floorplan-img');img.style.width=(edImgNW*edZoom)+'px';img.style.height=(edImgNH*edZoom)+'px';document.getElementById('edZoomVal').textContent=Math.round(edZoom*100)+'%';}
+function edApplyZoom(){const img=document.getElementById('ed-floorplan-img');const scaledZoom=edZoom*edImageScale;img.style.width=(edImgNW*scaledZoom)+'px';img.style.height=(edImgNH*scaledZoom)+'px';document.getElementById('edZoomVal').textContent=Math.round(edZoom*100)+'%';}
 function edClearAllBoxes(){if(!confirm('모든 박스를 초기화할까요?'))return;edBoxes={};edRenderAllBoxes();edRenderUnitList();}
 
 // 이 그룹(층) 초기화 — 현재 선택된 그룹의 배치+이미지만 삭제
@@ -3298,12 +3314,9 @@ function edSaveToMap(){
   const boxData = Object.fromEntries(Object.entries(edBoxes).map(([k,v])=>[k,{
     x:v.x,y:v.y,w:v.w,h:v.h,rot:v.rot||0,
     name:v.unit?.상호명||'',textAlign:v.textAlign||'left',dong:v.unit?.동||'',hosu:v.unit?.호수||k,
-    fontFamily:v.fontFamily||'Noto Sans KR',
-    textStroke:v.textStroke||false,
-    textStrokeColor:v.textStrokeColor||'#ffffff',
-    textStrokeWidth:v.textStrokeWidth||1,
-    textShadow:v.textShadow!==false,
-    textShadowColor:v.textShadowColor||'#ffffff'
+    displayFilter:v.displayFilter||'suggest',
+    filterTags:v.filterTags||[],
+    imageScale:v.imageScale||1.0
   }]));
 
   const edInput = document.getElementById('edImgInput');
