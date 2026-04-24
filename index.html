@@ -1564,9 +1564,9 @@ function buildFloorplanView(bName, fp) {
       let colorCls = 'fp-color-default';
       if (proc === '공실') colorCls = 'fp-color-vacant';
       else if (proc === '제안가능(등록)') colorCls = 'fp-color-suggest';
-      // 전역 글꼴 적용
-      const fontFamily = fp.fontFamily || 'Noto Sans KR';
-      box.innerHTML = `<span class="fp-name ${colorCls}" style="font-size:${fName.toFixed(1)}px;text-align:${ta};font-family:'${fontFamily}',sans-serif">${b.name||ho}</span>`;
+      // 전역 글꼴 적용 (성능 최적화 중 — 기본값 사용)
+      // const fontFamily = fp.fontFamily || 'Noto Sans KR';
+      box.innerHTML = `<span class="fp-name ${colorCls}" style="font-size:${fName.toFixed(1)}px;text-align:${ta}">${b.name||ho}</span>`;
       box.style.pointerEvents = 'auto';
       box.style.cursor = 'pointer';
       box.dataset.hosu = ho;
@@ -1861,9 +1861,9 @@ function openFloorplanFullscreen(bName, fp) {
       let colorCls = 'fp-color-default';
       if (proc === '공실') colorCls = 'fp-color-vacant';
       else if (proc === '제안가능(등록)') colorCls = 'fp-color-suggest';
-      // 전역 글꼴 적용
-      const fontFamily = fp.fontFamily || 'Noto Sans KR';
-      box.innerHTML = `<span class="fp-name ${colorCls}" style="font-size:${fName.toFixed(1)}px;text-align:${ta};font-family:'${fontFamily}',sans-serif">${b.name||ho}</span>`;
+      // 전역 글꼴 적용 (성능 최적화 중 — 기본값 사용)
+      // const fontFamily = fp.fontFamily || 'Noto Sans KR';
+      box.innerHTML = `<span class="fp-name ${colorCls}" style="font-size:${fName.toFixed(1)}px;text-align:${ta}">${b.name||ho}</span>`;
       box.style.cursor = 'pointer';
       box.addEventListener('click', (ev) => {
         ev.stopPropagation();
@@ -2593,10 +2593,10 @@ function edLoadGroup(bName, gName) {
   });
   edApplyDirLabels();
 
-  // 전역 글꼴 복원
+  // 전역 글꼴 복원 (성능 최적화 중)
   edGlobalFontFamily = saved.fontFamily || 'Noto Sans KR';
-  const fontSelect = document.getElementById('edGlobalFontFamily');
-  if (fontSelect) fontSelect.value = edGlobalFontFamily;
+  // const fontSelect = document.getElementById('edGlobalFontFamily');
+  // if (fontSelect) fontSelect.value = edGlobalFontFamily;
 
   edActiveDong = '전체';
   edRenderGroupTabs(bName);
