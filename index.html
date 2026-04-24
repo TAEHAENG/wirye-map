@@ -740,6 +740,12 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
       <div class="ed-canvas-scroller" id="edCanvasScroller" style="display:none">
         <div class="ed-canvas-wrapper" id="edCanvasWrapper">
           <img id="ed-floorplan-img" src="" alt="평면도" draggable="false">
+          <!-- 카드 크기 가이드 -->
+          <div id="edCardDisplayGuide" style="display:none;position:absolute;border:2px dashed #3b82f6;pointer-events:none;background:rgba(59,130,246,0.05);top:0;left:0">
+            <div style="position:absolute;bottom:-24px;left:0;font-size:10px;color:#3b82f6;font-weight:600;white-space:nowrap;background:#fff;padding:2px 4px;border-radius:3px;border:1px solid #3b82f6">
+              📍 카드 크기: <span id="edCardGuideDims">0×0</span>px
+            </div>
+          </div>
           <!-- 열 정렬 가이드라인 (JS로 추가됨) -->
         </div>
       </div>
@@ -1495,14 +1501,9 @@ function buildFloorplanView(bName, fp) {
 
   // 이미지 로드 후: 이미지 비율에 맞춰 카드 폭 조절 + 글씨 크기 계산
   const renderBoxes = () => {
-    // 카드 표시 비율 적용
-    const displayScale = (fp.cardDisplayScale || 100) / 100;
-    const natW = (img.naturalWidth || 1) * displayScale, natH = (img.naturalHeight || 1) * displayScale;
-    img.style.width = natW + 'px';
-    img.style.height = natH + 'px';
     // 이미지 비율에 따라 카드 폭 자동 조절 (사용자가 수동으로 크기 설정한 경우 건너뜀)
-    const origW = img.naturalWidth || 1, origH = img.naturalHeight || 1;
-    const ratio = origW / origH;
+    const natW = img.naturalWidth || 1, natH = img.naturalHeight || 1;
+    const ratio = natW / natH;
     const card = container.closest('.building-card');
     const cid = card?.id;
     const userSized = cid && positions[cid]?.w;
@@ -1546,12 +1547,15 @@ function buildFloorplanView(bName, fp) {
     // 박스 % 크기 기반으로 폰트 크기 계산 (이미지 크기와 무관하게 일정한 비율 유지)
     const bCol = sheetHeaders.find(h => h === '건물명' || h === '상가명') || '';
     const dongCol = sheetHeaders.find(h => h === '동') || '';
+    // 카드 표시 비율 적용 (박스 폰트 크기 계산에만)
+    const displayScale = (fp.cardDisplayScale || 100) / 100;
+    const effectiveCW = cW * displayScale;
     for (const [key, b] of Object.entries(fp.boxes)) {
       const box = document.createElement('div'); box.className='card-fp-box';
       box.style.left=b.x+'%'; box.style.top=b.y+'%'; box.style.width=b.w+'%'; box.style.height=b.h+'%';
       if(b.rot) box.style.transform=`rotate(${b.rot}deg)`;
       // 박스 너비(%)를 실제 픽셀로 변환 후 폰트 크기 계산
-      const boxWidthPx = cW * (b.w / 100);
+      const boxWidthPx = effectiveCW * (b.w / 100);
       const fName = Math.max(6, Math.min(96, boxWidthPx * 0.15)); // 박스 너비의 15% ± 클램핑(6-96px)
       const ta = b.textAlign || 'left';
       // 동+호수로 정확 매칭 (하위호환: dong/hosu 없으면 key를 호수로 사용)
@@ -1831,7 +1835,6 @@ function openFloorplanFullscreen(bName, fp) {
     const bCol = sheetHeaders.find(h => h === '건물명' || h === '상가명') || '';
     const dongCol = sheetHeaders.find(h => h === '동') || '';
     const dispW = img.offsetWidth;
-    const natW = img.naturalWidth || 1;
     if (!dispW) {
       renderFSBoxes._tries = (renderFSBoxes._tries || 0) + 1;
       if (renderFSBoxes._tries < 30) requestAnimationFrame(renderFSBoxes);
@@ -1840,12 +1843,14 @@ function openFloorplanFullscreen(bName, fp) {
     renderFSBoxes._tries = 0;
     inner.querySelectorAll('.card-fp-box').forEach(el => el.remove());
     // 박스 % 크기 기반으로 폰트 크기 계산 (이미지 크기와 무관하게 일정한 비율 유지)
+    const displayScale = (fp.cardDisplayScale || 100) / 100;
+    const effectiveW = dispW * displayScale;
     for (const [key, b] of Object.entries(fp.boxes)) {
       const box = document.createElement('div'); box.className='card-fp-box';
       box.style.left=b.x+'%'; box.style.top=b.y+'%'; box.style.width=b.w+'%'; box.style.height=b.h+'%';
       if (b.rot) box.style.transform = `rotate(${b.rot}deg)`;
       // 박스 너비(%)를 실제 픽셀로 변환 후 폰트 크기 계산
-      const boxWidthPx = dispW * (b.w / 100);
+      const boxWidthPx = effectiveW * (b.w / 100);
       const fName = Math.max(6, Math.min(96, boxWidthPx * 0.15)); // 박스 너비의 15% ± 클램핑(6-96px)
       const ta = b.textAlign || 'left';
       const ho = b.hosu || key;
@@ -2111,11 +2116,43 @@ let edCardDisplayScale = 100;
 function edUpdateCardDisplayScale(val) {
   edCardDisplayScale = parseInt(val);
   document.getElementById('edCardDisplayScaleVal').textContent = edCardDisplayScale + '%';
+  // 카드 가이드 업데이트 (시각적 피드백)
+  updateCardDisplayGuide();
   // 현재 그룹 데이터에 저장
   if (edGroupNameVal && positions[edCurrentBuildingId + '_' + edGroupNameVal]) {
     positions[edCurrentBuildingId + '_' + edGroupNameVal].cardDisplayScale = edCardDisplayScale;
   }
-  edSaveToMap(); // 즉시 반영
+  edRenderAllBoxes(); // 박스 폰트 크기 즉시 반영
+  edSaveToMap();
+}
+
+// 카드 가이드 업데이트 (카드 경계를 평면도 위에 시각화)
+function updateCardDisplayGuide() {
+  const bName = document.getElementById('edBuildingSelect').value;
+  if (!bName) return;
+
+  const cardId = 'card_' + btoa(encodeURIComponent(bName)).replace(/[^a-zA-Z0-9]/g, '_');
+  const pos = positions[cardId];
+  if (!pos || !pos.cardWidth) {
+    document.getElementById('edCardDisplayGuide').style.display = 'none';
+    return;
+  }
+
+  const img = document.getElementById('ed-floorplan-img');
+  if (!img.src) {
+    document.getElementById('edCardDisplayGuide').style.display = 'none';
+    return;
+  }
+
+  const displayScale = edCardDisplayScale / 100;
+  const scaledW = Math.round(pos.cardWidth * displayScale);
+  const scaledH = Math.round(pos.cardHeight * displayScale);
+
+  const guide = document.getElementById('edCardDisplayGuide');
+  guide.style.display = '';
+  guide.style.width = scaledW + 'px';
+  guide.style.height = scaledH + 'px';
+  document.getElementById('edCardGuideDims').textContent = scaledW + '×' + scaledH;
 }
 
 // ── 상자 설정 모드 토글 ──
@@ -2511,6 +2548,7 @@ function edLoadGroup(bName, gName) {
       edImgNW = img.naturalWidth; edImgNH = img.naturalHeight;
       edZoom = 1.0; // 줌 초기화
       edApplyZoom(); edRenderAllBoxes(); edUpdateAlignGuide(); edApplyDirLabels();
+      updateCardDisplayGuide(); // 카드 가이드 표시
       edSetupImageDragResize();
     };
     document.getElementById('edCanvasWrapper').removeEventListener('click', edOnCanvasClick);
@@ -2555,6 +2593,7 @@ function edHandleImage(input) {
     edImgX = 0; edImgY = 0; // 위치 초기화
     edApplyZoom(); edRenderAllBoxes();
     edUpdateAlignGuide();
+    updateCardDisplayGuide(); // 카드 가이드 표시
     edSetupImageDragResize(); // 드래그 기능 활성화
   };
   const _wrap = document.getElementById('edCanvasWrapper');
@@ -3229,6 +3268,8 @@ function edRenderAllBoxes() {
   wr.querySelectorAll('.obox').forEach(el=>el.remove());
   // 캔버스 너비 기반 폰트 크기 계산
   const canvasW = edImgNW * edZoom;
+  const displayScale = (edCardDisplayScale || 100) / 100;
+  const effectiveW = canvasW * displayScale;
   for (const [bkey,b] of Object.entries(edBoxes)) {
     const el = document.createElement('div');
     const selKey = edSelectedUnit ? edBoxKey(edSelectedUnit) : '';
@@ -3240,8 +3281,8 @@ function edRenderAllBoxes() {
     const rotDeg = b.rot || 0;
     const displayName = b.unit?.상호명 || b.name || b.unit?.호수 || bkey;
     // 박스 너비 기반 폰트 크기 (전체지도와 동일한 로직)
-    const boxWidthPx = canvasW * (b.w / 100);
-    const fName = Math.max(10, Math.min(36, boxWidthPx * 0.15));
+    const boxWidthPx = effectiveW * (b.w / 100);
+    const fName = Math.max(6, Math.min(96, boxWidthPx * 0.15));
     el.innerHTML = `<div class="obox-hosu">${b.unit?.호수||bkey}</div><div class="obox-name" style="text-align:${ta};font-size:${fName}px">${displayName}</div><div class="obox-del">✕</div><div class="obox-rotate-label">${rotDeg}°</div><div class="obox-rotate" title="드래그하여 회전">↻</div><div class="obox-resize"></div>`;
     el.querySelector('.obox-del').addEventListener('click',ev=>{ev.stopPropagation();delete edBoxes[bkey];edRenderAllBoxes();edRenderUnitList();});
     el.querySelector('.obox-rotate').addEventListener('mousedown',edStartRotate);
