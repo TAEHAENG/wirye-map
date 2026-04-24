@@ -1476,17 +1476,16 @@ function buildFloorplanView(bName, fp) {
     }
     renderBoxes._tries = 0;
     container.querySelectorAll('.card-fp-box').forEach(el => el.remove());
-    const scale = cW / natW;
-    // 편집기와 동일한 비율의 텍스트 크기 (편집기 obox-name: 11px 기준)
-    const baseFontPx = 11;
-    // 건물명 컬럼 자동 탐색
+    // 박스 % 크기 기반으로 폰트 크기 계산 (이미지 크기와 무관하게 일정한 비율 유지)
     const bCol = sheetHeaders.find(h => h === '건물명' || h === '상가명') || '';
     const dongCol = sheetHeaders.find(h => h === '동') || '';
     for (const [key, b] of Object.entries(fp.boxes)) {
       const box = document.createElement('div'); box.className='card-fp-box';
       box.style.left=b.x+'%'; box.style.top=b.y+'%'; box.style.width=b.w+'%'; box.style.height=b.h+'%';
       if(b.rot) box.style.transform=`rotate(${b.rot}deg)`;
-      const fName = baseFontPx * scale;
+      // 박스 너비(%)를 실제 픽셀로 변환 후 폰트 크기 계산
+      const boxWidthPx = cW * (b.w / 100);
+      const fName = Math.max(9, Math.min(26, boxWidthPx * 0.12)); // 박스 너비의 12% ± 클램핑(9-26px)
       const ta = b.textAlign || 'left';
       // 동+호수로 정확 매칭 (하위호환: dong/hosu 없으면 key를 호수로 사용)
       const ho = b.hosu || key;
@@ -1773,13 +1772,14 @@ function openFloorplanFullscreen(bName, fp) {
     }
     renderFSBoxes._tries = 0;
     inner.querySelectorAll('.card-fp-box').forEach(el => el.remove());
-    const scale = dispW / natW;
-    const baseFontPx = 11;
+    // 박스 % 크기 기반으로 폰트 크기 계산 (이미지 크기와 무관하게 일정한 비율 유지)
     for (const [key, b] of Object.entries(fp.boxes)) {
       const box = document.createElement('div'); box.className='card-fp-box';
       box.style.left=b.x+'%'; box.style.top=b.y+'%'; box.style.width=b.w+'%'; box.style.height=b.h+'%';
       if (b.rot) box.style.transform = `rotate(${b.rot}deg)`;
-      const fName = baseFontPx * scale;
+      // 박스 너비(%)를 실제 픽셀로 변환 후 폰트 크기 계산
+      const boxWidthPx = dispW * (b.w / 100);
+      const fName = Math.max(9, Math.min(26, boxWidthPx * 0.12)); // 박스 너비의 12% ± 클램핑(9-26px)
       const ta = b.textAlign || 'left';
       const ho = b.hosu || key;
       const dong = b.dong || '';
