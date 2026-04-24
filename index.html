@@ -301,11 +301,15 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
 .crop-box .crop-handle.tr{top:-6px;right:-6px;cursor:ne-resize}
 .crop-box .crop-handle.bl{bottom:-6px;left:-6px;cursor:sw-resize}
 .crop-box .crop-handle.br{bottom:-6px;right:-6px;cursor:se-resize}
+/* 여백 경계선 */
+.crop-pad-line{position:absolute;background:#ef4444;z-index:50;pointer-events:none;box-shadow:0 0 4px rgba(239,68,68,0.5)}
+.crop-pad-line.top,.crop-pad-line.bottom{width:100%;height:2px}
+.crop-pad-line.left,.crop-pad-line.right{width:2px;height:100%}
 .crop-toolbar{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:55;align-items:center;background:rgba(255,255,255,.97);padding:6px 10px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.2);flex-wrap:wrap;max-width:92%}
 .crop-toolbar button{padding:6px 16px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
 .crop-toolbar .crop-ok{background:#2563eb;color:#fff}
 .crop-toolbar .crop-cancel{background:#f3f4f6;color:#333}
-.crop-pad-group{display:flex;align-items:center;gap:3px;padding:0 6px;border-right:1px solid #e5e7eb}
+.crop-pad-group{display:flex;align-items:center;gap:4px;padding:0 6px;border-right:1px solid #e5e7eb}
 .crop-pad-group:last-of-type{border-right:none}
 .crop-pad-label{font-size:11px;color:#6b7280;font-weight:700;min-width:14px;text-align:center}
 .crop-pad-btn{width:22px;height:22px;padding:0!important;background:#e5e7eb;color:#333;font-size:13px;border-radius:4px!important;display:flex;align-items:center;justify-content:center}
@@ -2867,20 +2871,51 @@ function edComposeApply() {
 }
 
 // ── 크롭 기능 ──
-// 4방향 여백 (px) — 상/하/좌/우 개별 조절
-let edCropPad = { top: 100, bottom: 100, left: 100, right: 100 };
+// 4방향 여백 (px) — 상/하/좌/우 개별 조절 (원본 기준 0)
+let edCropPad = { top: 0, bottom: 0, left: 0, right: 0 };
 const EDCROP_SIDES = ['top', 'bottom', 'left', 'right'];
 
-function edAdjustCropPad(side, delta) {
-  if (side === 'all') {
-    EDCROP_SIDES.forEach(s => { edCropPad[s] = Math.max(0, Math.min(800, edCropPad[s] + delta)); });
-  } else {
-    edCropPad[side] = Math.max(0, Math.min(800, edCropPad[side] + delta));
+function edUpdateCropPad(side, val) {
+  edCropPad[side] = Math.max(-800, Math.min(800, parseInt(val) || 0));
+  const inp = document.getElementById('edCropPadInput_' + side);
+  if (inp) inp.value = edCropPad[side];
+  edUpdateCropPadLine(side);
+}
+
+function edUpdateCropPadLive(side, val) {
+  const v = parseInt(val) || 0;
+  if (v >= -800 && v <= 800) {
+    edCropPad[side] = v;
+    edUpdateCropPadLine(side);
   }
-  EDCROP_SIDES.forEach(s => {
-    const el = document.getElementById('edCropPadVal_' + s);
-    if (el) el.textContent = edCropPad[s];
-  });
+}
+
+function edUpdateCropPadLine(side) {
+  const box = document.querySelector('#edCanvasWrapper .crop-box');
+  if (!box) return;
+
+  const line = document.getElementById('edCropLine_' + side);
+  if (!line) return;
+
+  const boxW = parseFloat(box.style.width);
+  const boxH = parseFloat(box.style.height);
+  const img = document.getElementById('ed-floorplan-img');
+  const displayW = img.offsetWidth;
+  const displayH = img.offsetHeight;
+
+  // px를 % 기준으로 변환
+  const padPx = edCropPad[side];
+  const padPercent = (padPx / (side === 'left' || side === 'right' ? displayW : displayH)) * 100;
+
+  if (side === 'top') {
+    line.style.top = (-padPercent) + '%';
+  } else if (side === 'bottom') {
+    line.style.top = (boxH + padPercent) + '%';
+  } else if (side === 'left') {
+    line.style.left = (-padPercent) + '%';
+  } else if (side === 'right') {
+    line.style.left = (boxW + padPercent) + '%';
+  }
 }
 
 // 편집 모드 — 'crop' (자르기만) / 'pad' (여백만) / 'both' (기존 방식)
@@ -2895,7 +2930,7 @@ function edStartCrop(mode) {
   if (edCropMode === 'crop') {
     edCropPad = { top:0, bottom:0, left:0, right:0 };
   } else if (edCropMode === 'pad') {
-    edCropPad = { top:100, bottom:100, left:100, right:100 };
+    edCropPad = { top:0, bottom:0, left:0, right:0 }; // 원본 기준(0)으로 시작
   }
 
   const overlay = document.createElement('div'); overlay.className = 'crop-overlay';
@@ -2911,23 +2946,30 @@ function edStartCrop(mode) {
     box.appendChild(h);
   });
 
+  // 여백 모드: 경계선 추가
+  if (edCropMode === 'pad') {
+    ['top','bottom','left','right'].forEach(side => {
+      const line = document.createElement('div');
+      line.className = 'crop-pad-line ' + side;
+      line.id = 'edCropLine_' + side;
+      box.appendChild(line);
+    });
+  }
+
   const toolbar = document.createElement('div'); toolbar.className = 'crop-toolbar';
   const padGroup = (side, label, title) => `
     <div class="crop-pad-group" title="${title} 여백(px)">
       <span class="crop-pad-label">${label}</span>
-      <button class="crop-pad-btn" onclick="edAdjustCropPad('${side}',-20)">−</button>
-      <span class="crop-pad-val" id="edCropPadVal_${side}">${edCropPad[side]}</span>
-      <button class="crop-pad-btn" onclick="edAdjustCropPad('${side}',20)">+</button>
+      <input type="number" id="edCropPadInput_${side}" value="0" min="-800" max="800"
+        style="width:50px;height:24px;font-size:11px;border:1.5px solid var(--line);border-radius:5px;padding:0 4px;font-family:monospace"
+        onchange="edUpdateCropPad('${side}', this.value)" oninput="edUpdateCropPadLive('${side}', this.value)">
+      <span style="font-size:10px;color:var(--text2)">px</span>
     </div>`;
   const padControls = (edCropMode === 'crop') ? '' : `
-    ${padGroup('top', '↑', '상')}
-    ${padGroup('bottom', '↓', '하')}
-    ${padGroup('left', '←', '좌')}
-    ${padGroup('right', '→', '우')}
-    <div class="crop-pad-group" style="border-right:none">
-      <button class="crop-pad-all" onclick="edAdjustCropPad('all',-20)" title="모두 -20">전체−</button>
-      <button class="crop-pad-all" onclick="edAdjustCropPad('all',20)" title="모두 +20">전체+</button>
-    </div>`;
+    ${padGroup('top', '↑ 상', '상')}
+    ${padGroup('bottom', '↓ 하', '하')}
+    ${padGroup('left', '← 좌', '좌')}
+    ${padGroup('right', '→ 우', '우')}`;
   const okLabel = edCropMode === 'crop' ? '✓ 잘라내기' : (edCropMode === 'pad' ? '✓ 여백 추가' : '✓ 잘라내기+여백');
   toolbar.innerHTML = `${padControls}
     <button class="crop-ok" onclick="edApplyCrop()">${okLabel}</button>
@@ -2937,6 +2979,11 @@ function edStartCrop(mode) {
   overlay.appendChild(box);
   overlay.appendChild(toolbar);
   wrap.appendChild(overlay);
+
+  // 여백 모드: 경계선 초기화
+  if (edCropMode === 'pad') {
+    ['top','bottom','left','right'].forEach(side => edUpdateCropPadLine(side));
+  }
 
   // 박스 드래그 (이동)
   box.addEventListener('mousedown', (e) => {
