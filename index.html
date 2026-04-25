@@ -2198,7 +2198,7 @@
         </div>
         <div class="col-search-wrap">
           <input id="SI-type" class="col-search-input" type="text" placeholder="">
-          <span class="col-search-label">입(공용)</span>
+          <span class="col-search-label">타입(공용)</span>
         </div>
       </div>
       <button class="reset-btn" onclick="resetAll()">초기화</button>
@@ -2680,8 +2680,9 @@
     }
 
     // ── 설정 ─────────────────────────────────────────
+    // ⚠️ API 키는 환경변수 또는 백엔드에서 로드해야 함 (공개 노출 금지)
     var SSID = '1Csxt63V81HA3CG2n8aYy_F5VzFzIOravBs03Xh77Hsw';
-    var AKEY = 'AIzaSyD5YiNNP1d9cmnehlSLDViEOBdjZhealMw';
+    var AKEY = ''; // ❌ REMOVED: 노출된 키 제거됨 - 새 키로 교체 필요
     var SGID = '505657259';
     var ASURL = 'https://script.google.com/macros/s/AKfycbzi9seNa_t0NEmP2Ft5Zy08fUrgX8Hk3hVXGycNOR_ZVeKTAM4E_oq88JkuiW0EbgFVFA/exec';
     var TM = { "매매": ["매매", "매전세", "매월세", "매전월"], "전세": ["전세", "매전세", "전월세", "매전월"], "월세": ["월세", "매월세", "전월세", "매전월"] };
@@ -4982,13 +4983,16 @@
 
     // ── 상가 상세 ────────────────────────────────────
     function sgDet(idx) {
-      _sgCurIdx = idx; sgCancelEdit();
-      var r = _sgFD[idx];
-      // RAW에서 최신 데이터 가져오기 (데이터 신선도 보장)
-      if (r['__row__']) {
-        var rLatest = _sgRaw.find(function(row) { return row['__row__'] === r['__row__']; });
-        if (rLatest) r = rLatest;
-      }
+      try {
+        _sgCurIdx = idx; sgCancelEdit();
+        var r = _sgFD[idx];
+        if (!r) { console.error('sgDet: 데이터 없음, idx=' + idx); return; }
+        // RAW에서 최신 데이터 가져오기 (데이터 신선도 보장)
+        if (r['__row__'] && _sgRaw && Array.isArray(_sgRaw)) {
+          var rLatest = _sgRaw.find(function(row) { return row && row['__row__'] === r['__row__']; });
+          if (rLatest) r = rLatest;
+        }
+      } catch(e) { console.error('sgDet 오류:', e.message); return; }
       var side = r['측'] ? r['측'] + ' ' : '';
       document.getElementById('sg-DT').textContent = (r['건물명']||'') + ' ' + side + (r['동']||'') + ' ' + (r['호']||'');
       document.getElementById('sg-DS').textContent = (r['유형']||'') + (r['프로세스'] ? ' · ' + r['프로세스'] : '') + (r['실행일'] ? ' · ' + r['실행일'] : '') + (r['손님구분'] ? ' · ' + r['손님구분'] : '');
@@ -5138,7 +5142,9 @@
     async function sgSaveEdit() {
       if (!SG_ASURL) { showToast('상가 Apps Script URL이 설정되지 않았습니다. SG_ASURL을 설정하세요.'); return; }
       var r = _sgFD[_sgCurIdx];
-      var get = function(id) { var el = document.getElementById(id); return el ? el.value : ''; };
+      var get = function(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; };
+      var bldName = get('sge-building');
+      if (!bldName) { showToast('⚠️ 건물명은 삭제할 수 없습니다'); return; }
       var vals = {};
       var fields = [
         ['건물명','sge-building'],['유형','sge-type'],['측','sge-side'],['동','sge-dong'],['호','sge-ho'],
@@ -6213,7 +6219,7 @@
           </div>
           <div class="col-search-wrap">
             <input id="sg-SI-type" class="col-search-input" type="text" placeholder="">
-            <span class="col-search-label">입(공용)</span>
+            <span class="col-search-label">타입(공용)</span>
           </div>
         </div>
         <button class="reset-btn" onclick="sgResetAll()">초기화</button>
