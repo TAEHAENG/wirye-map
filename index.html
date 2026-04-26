@@ -9,9 +9,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="상가맵">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <link rel="icon" type="image/svg+xml" href="icons/상가맵.svg">
-<link rel="shortcut icon" href="icons/favicon.svg">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
 <link rel="manifest" href="icons/manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" async></script>
 <style>
@@ -3379,8 +3379,12 @@ function edApplyPadLines() {
     axis.x = (axis.x / 100 * srcW + padL) / outW * 100;
     axis.y = (axis.y / 100 * srcH + padT) / outH * 100;
   });
+  // 2MP 이하면 PNG(무손실), 그 이상이면 WebP 0.97(고화질)
+  const px = outW * outH;
   const supportsWebP = cvs.toDataURL('image/webp').startsWith('data:image/webp');
-  const dataURL = supportsWebP ? cvs.toDataURL('image/webp', 0.95) : cvs.toDataURL('image/png');
+  const dataURL = (px <= 2_000_000 || !supportsWebP)
+    ? cvs.toDataURL('image/png')
+    : cvs.toDataURL('image/webp', 0.97);
   const input = document.getElementById('edImgInput');
   if (input) input.value = '';
   edImageURL = dataURL;
@@ -4002,19 +4006,45 @@ function edSaveToMap(){
     const reader = new FileReader();
     reader.onload = e => doSave(e.target.result);
     reader.readAsDataURL(file);
+  } else if (edImageURL && edImageURL.startsWith('data:')) {
+    // 이미 data URL이면 캔버스 재인코딩 불필요 — 화질 손실 방지
+    doSave(edImageURL);
   } else {
-    // 파일이 없으면 (reloaded from blob) canvas로 저장
+    // blob URL — 캔버스 경유 (최초 로드 후 여백 미적용 상태)
     const img = document.getElementById('ed-floorplan-img');
     const cvs = document.createElement('canvas');
     cvs.width = img.naturalWidth; cvs.height = img.naturalHeight;
     cvs.getContext('2d').drawImage(img, 0, 0);
-    // WebP 지원시 WebP(무손실에 가까운), 미지원시 PNG
     const supportsWebP = cvs.toDataURL('image/webp').startsWith('data:image/webp');
-    doSave(supportsWebP ? cvs.toDataURL('image/webp', 0.95) : cvs.toDataURL('image/png'));
+    doSave(supportsWebP ? cvs.toDataURL('image/webp', 0.97) : cvs.toDataURL('image/png'));
   }
 }
 
 function tryCompressedSave(originalURL, bName, boxData) {
+  // localStorage 초과 시 이미지 품질 강제 저하를 방지:
+  // 이미지 없이 메타데이터만 로컬에 저장하고 원본 화질은 Supabase에 보관
+  const gName = edGroupNameVal || '1층';
+  if (!floorplans[bName]) floorplans[bName] = {};
+  if (!floorplans[bName][gName]) floorplans[bName][gName] = {};
+  floorplans[bName][gName].boxes = boxData;
+  floorplans[bName][gName].groupName = gName;
+  floorplans[bName][gName].savedAt = new Date().toISOString();
+  if (originalURL) floorplans[bName][gName].imgDataURL = originalURL;
+  // 이미지 제외한 슬림 버전만 localStorage에 저장
+  const slim = {};
+  for (const [bn, grps] of Object.entries(floorplans)) {
+    slim[bn] = {};
+    for (const [gn, gd] of Object.entries(grps)) {
+      const { imgDataURL, ...meta } = gd; slim[bn][gn] = meta;
+    }
+  }
+  try { localStorage.setItem(FLOORPLAN_KEY, JSON.stringify(slim)); } catch(e) {}
+  showToast('✅ 저장 완료 (로컬 용량 부족 → 이미지는 클라우드에 보관)');
+  const cid = 'card_' + btoa(encodeURIComponent(bName)).replace(/[^a-zA-Z0-9]/g, '_');
+  rebuildCard(cid, bName);
+  cloudSaveAll();
+}
+function _tryCompressedSave_UNUSED(originalURL, bName, boxData) {
   const img2 = new Image();
   img2.onload = () => {
     const steps = [
