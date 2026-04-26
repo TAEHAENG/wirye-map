@@ -550,6 +550,16 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
   </div>
   <div class="topbar-sep"></div>
 
+  <!-- 평면도 편집 모드 전용 액션 버튼 -->
+  <div id="editorActions" style="display:none;gap:4px;align-items:center;flex-shrink:0">
+    <button class="btn" style="font-size:10px;padding:3px 7px" onclick="edClearGroupBoxes()" title="현재 그룹 초기화">🏢 그룹 초기화</button>
+    <button class="btn" style="font-size:10px;padding:3px 7px" onclick="edClearAllBoxes()" title="전체 초기화">전체 초기화</button>
+    <button class="btn primary" style="font-size:10px;padding:3px 7px" onclick="edSaveToMap()" title="지도에 저장">🗺️ 저장</button>
+    <button class="btn" style="font-size:10px;padding:3px 7px" onclick="edExportImg()" title="이미지 다운로드">📷 이미지</button>
+    <button class="btn" style="font-size:10px;padding:3px 7px" onclick="edSaveLayout()" title="JSON 저장">💾 JSON</button>
+    <label class="btn" style="font-size:10px;padding:3px 7px;cursor:pointer;display:inline-flex;align-items:center;gap:2px" title="JSON 불러오기">📂 불러오기<input type="file" accept=".json" style="display:none" onchange="edLoadLayout(this)"></label>
+  </div>
+
   <!-- 전체지도용 검색 -->
   <div class="topbar-search" id="mapSearchWrap">
     <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="4.5" stroke="#9ca3af" stroke-width="1.5"/><path d="M9 9L12 12" stroke="#9ca3af" stroke-width="1.5" stroke-linecap="round"/></svg>
@@ -714,21 +724,6 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
 
       <div class="ed-sidebar-foot">
         <div class="ed-hint" style="padding:5px 8px;font-size:10px">목록에서 호수 선택 후 평면도를 클릭해 위치 지정</div>
-        <div style="display:flex;gap:4px">
-          <button class="btn" style="flex:1;font-size:10px" onclick="edClearGroupBoxes()" title="현재 선택된 그룹(층)의 배치와 평면도만 초기화합니다">🏢 이 그룹 초기화</button>
-          <button class="btn" style="flex:1;font-size:10px" onclick="edClearAllBoxes()" title="현재 편집 중인 모든 박스 배치를 초기화합니다">전체 초기화</button>
-        </div>
-        <div style="display:flex;gap:4px">
-          <button class="btn primary" style="flex:1;font-size:10px" onclick="edSaveToMap()" title="현재 그룹의 평면도와 호실 배치를 전체지도에 반영합니다">🗺️ 지도에 저장</button>
-          <button class="btn" style="flex:1;font-size:10px" onclick="edExportImg()" title="현재 평면도를 호실명이 표시된 PNG 이미지로 다운로드합니다">📷 이미지</button>
-        </div>
-        <div style="display:flex;gap:4px">
-          <button class="btn" style="flex:1;font-size:10px" onclick="edSaveLayout()" title="호실 배치 좌표를 JSON 파일로 다운로드합니다 (백업용)">💾 JSON 저장</button>
-          <label class="btn" style="flex:1;font-size:10px;cursor:pointer;justify-content:center" title="이전에 저장한 JSON 레이아웃 파일을 불러와 배치를 복원합니다">
-            📂 불러오기
-            <input type="file" accept=".json" style="display:none" onchange="edLoadLayout(this)">
-          </label>
-        </div>
       </div>
     </div>
 
@@ -964,6 +959,7 @@ function switchPage(page) {
   // 전체지도용 컨트롤 표시/숨김
   document.getElementById('mapSearchWrap').style.display = page === 'map' ? '' : 'none';
   document.getElementById('mapActions').style.display = page === 'map' ? '' : 'none';
+  document.getElementById('editorActions').style.display = page === 'editor' ? 'flex' : 'none';
   // 편집 페이지 진입 시 저장공간 표시 갱신 (브라우저 즉시, 클라우드는 캐시 사용)
   if (page === 'editor') {
     refreshAllStorageStats(false);
@@ -2492,10 +2488,28 @@ function edRenderAxisControls() {
   });
 }
 
+function edReattachAllBoxesToAxis(id) {
+  const axis = edAxes.find(a => a.id === id);
+  if (!axis) return;
+  Object.values(edBoxes).forEach(b => {
+    const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+    const proj = edProjectToAxis(axis, cx, cy);
+    b.axisId = id;
+    b.axisT = proj.axisT;
+    b.axisSide = proj.perpDist >= 0 ? 'right' : 'left';
+    const pos = edBoxPosFromAxis(axis, b.axisT, b.axisSide, b.w);
+    b.x = Math.max(0, Math.min(99 - b.w, pos.x - b.w / 2));
+    b.y = Math.max(0, Math.min(99 - b.h, pos.y - b.h / 2));
+    b.rot = pos.rot;
+  });
+}
+
 function edSelectAxis(id) {
   edActiveAxisId = id;
+  edReattachAllBoxesToAxis(id);
   edRenderAxisControls();
   edUpdateAlignGuide();
+  edRenderAllBoxes();
 }
 
 // ── 정렬 가이드라인(SVG) 렌더 ──
@@ -4539,6 +4553,38 @@ async function syncFromCloud() {
 // ═══════════════════════════════════════════════
 // BOOT
 // ═══════════════════════════════════════════════
+(function generateFaviconPNG() {
+  try {
+    function drawIcon(size) {
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = size;
+      const c = cv.getContext('2d');
+      const g = c.createLinearGradient(0, 0, 0, size);
+      g.addColorStop(0, '#fb923c'); g.addColorStop(1, '#c2410c');
+      c.fillStyle = g;
+      const r = size * 0.18;
+      c.beginPath(); c.moveTo(r, 0); c.lineTo(size - r, 0);
+      c.arcTo(size, 0, size, r, r); c.lineTo(size, size - r);
+      c.arcTo(size, size, size - r, size, r); c.lineTo(r, size);
+      c.arcTo(0, size, 0, size - r, r); c.lineTo(0, r);
+      c.arcTo(0, 0, r, 0, r); c.closePath(); c.fill();
+      c.fillStyle = '#fff';
+      c.font = `bold ${Math.round(size * 0.65)}px 'Malgun Gothic','Apple SD Gothic Neo',sans-serif`;
+      c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+      c.fillText('상', size / 2, size * 0.78);
+      return cv.toDataURL('image/png');
+    }
+    // 브라우저 탭 파비콘 (32px PNG — SVG 미지원 환경 폴백)
+    const plink = document.createElement('link');
+    plink.rel = 'icon'; plink.type = 'image/png'; plink.sizes = '32x32';
+    plink.href = drawIcon(32);
+    document.head.appendChild(plink);
+    // apple-touch-icon 교체 (iOS 홈 화면 — 배경 포함 PNG 필요)
+    const alink = document.querySelector('link[rel="apple-touch-icon"]');
+    if (alink) alink.href = drawIcon(180);
+  } catch (e) {}
+})();
+
 loadData();
 
 </script>
