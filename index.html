@@ -2436,7 +2436,7 @@ function edBoxPosFromAxis(axis, axisT, axisSide, boxW) {
   return {
     x: axis.x + perpHalf * cosA + axisT * sinA,
     y: axis.y - perpHalf * sinA + axisT * cosA,
-    rot: axis.angle
+    rot: -axis.angle
   };
 }
 
