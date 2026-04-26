@@ -66,7 +66,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 .canvas{position:absolute;top:0;left:0;width:3000px;height:3000px;transform-origin:0 0}
 
 /* Building Card */
-.building-card{position:absolute;width:640px;min-width:400px;background:var(--paper2);border-radius:12px;border:1.5px solid var(--line);box-shadow:var(--shadow-lg);display:flex;flex-direction:column;overflow:hidden;transition:box-shadow .15s,width .3s;user-select:none}
+.building-card{position:absolute;width:640px;min-width:400px;background:var(--paper2);border-radius:12px;border:2px solid #3b82f6;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;overflow:hidden;transition:box-shadow .15s,width .3s;user-select:none}
 .building-card:hover{box-shadow:0 12px 40px rgba(0,0,0,.18)}
 .building-card.dragging{box-shadow:0 20px 60px rgba(37,99,235,.25);border-color:var(--blue-mid);z-index:100!important}
 .card-header{background:var(--blue);padding:10px 12px 8px;cursor:move;display:flex;flex-direction:column;gap:6px}
@@ -317,7 +317,7 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
 .crop-toolbar .crop-cancel{background:#f3f4f6;color:#333}
 .crop-toolbar-hint{font-size:10px;color:#6b7280;white-space:nowrap}
 /* 고화질 평면도 오버레이 */
-.card-fp-container{position:relative;width:100%;border-radius:6px;border:1px solid var(--line);overflow:visible;background:#f8f9fe;cursor:pointer}
+.card-fp-container{position:relative;width:100%;border-radius:6px;border:2px solid #ef4444;overflow:visible;background:#f8f9fe;cursor:pointer}
 .card-fp-container img{width:100%;display:block;image-rendering:auto}
 .card-fp-box{position:absolute;background:transparent;border:none;border-radius:0;overflow:visible;pointer-events:auto;display:flex;align-items:center;cursor:pointer}
 .card-fp-box .fp-name{font-weight:800;color:#1a1c2a;text-align:left;line-height:1.2;white-space:nowrap;padding:2px 4px;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 6px #fff;pointer-events:none;width:100%;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis}
@@ -379,7 +379,7 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
 .obox-name{font-size:11px;font-weight:700;color:#1a1c2a;text-align:left;padding:2px 6px;line-height:1.2;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;box-sizing:border-box}
 .obox-del{position:absolute;top:-10px;right:-10px;width:20px;height:20px;background:var(--red);color:#fff;border-radius:50%;font-size:10px;display:none;align-items:center;justify-content:center;cursor:pointer;z-index:20;font-weight:900;box-shadow:0 2px 6px rgba(0,0,0,.3);border:2px solid #fff}
 .obox:hover .obox-del-old{display:flex}
-.obox-resize{position:absolute;bottom:0;right:0;width:10px;height:10px;cursor:se-resize;background:var(--blue);opacity:.7;border-radius:1px 0 0 0}
+.obox-resize{position:absolute;right:-5px;top:50%;transform:translateY(-50%);width:8px;height:40%;min-height:12px;cursor:ew-resize;background:var(--blue);opacity:.7;border-radius:3px;z-index:10}
 .obox-rotate{position:absolute;top:-12px;right:-12px;width:24px;height:24px;background:var(--amber);color:#fff;border-radius:50%;font-size:13px;display:none;align-items:center;justify-content:center;cursor:grab;z-index:20;box-shadow:0 2px 6px rgba(0,0,0,.3);line-height:1;border:2px solid #fff;font-weight:700}
 .obox:hover .obox-rotate{display:flex}
 .obox-rotate-label{position:absolute;top:-24px;right:-8px;font-size:9px;color:var(--amber);font-weight:700;white-space:nowrap;pointer-events:none;display:none;background:#fff;padding:1px 4px;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.15)}
@@ -735,10 +735,10 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
     <!-- Canvas -->
     <div class="ed-canvas-area" id="edCanvasArea">
       <!-- 방향 설명 버튼 (평면도 외곽) -->
-      <button class="ed-dir-btn ed-dir-top" id="edDirBtn-top" onclick="edShowDirInput('top')" title="상단 방향 설명">↑</button>
-      <button class="ed-dir-btn ed-dir-bottom" id="edDirBtn-bottom" onclick="edShowDirInput('bottom')" title="하단 방향 설명">↓</button>
-      <button class="ed-dir-btn ed-dir-left" id="edDirBtn-left" onclick="edShowDirInput('left')" title="좌측 방향 설명">←</button>
-      <button class="ed-dir-btn ed-dir-right" id="edDirBtn-right" onclick="edShowDirInput('right')" title="우측 방향 설명">→</button>
+      <button class="ed-dir-btn ed-dir-top" id="edDirBtn-top" title="드래그: 좌우 이동 / 클릭: 방향 텍스트 편집">↑</button>
+      <button class="ed-dir-btn ed-dir-bottom" id="edDirBtn-bottom" title="드래그: 좌우 이동 / 클릭: 방향 텍스트 편집">↓</button>
+      <button class="ed-dir-btn ed-dir-left" id="edDirBtn-left" title="드래그: 상하 이동 / 클릭: 방향 텍스트 편집">←</button>
+      <button class="ed-dir-btn ed-dir-right" id="edDirBtn-right" title="드래그: 상하 이동 / 클릭: 방향 텍스트 편집">→</button>
       <label class="img-dropzone" id="edDropzone">
         <div style="font-size:40px">🗺️</div>
         <div style="font-weight:600;font-size:14px">평면도 이미지를 드래그하거나 클릭해서 업로드</div>
@@ -966,6 +966,7 @@ function switchPage(page) {
   if (page === 'editor') {
     refreshAllStorageStats(false);
     initEditorResizer();
+    edInitDirDrag();
   }
 }
 
@@ -1576,9 +1577,9 @@ function buildFloorplanView(bName, fp) {
       const box = document.createElement('div'); box.className='card-fp-box';
       box.style.left=b.x+'%'; box.style.top=b.y+'%'; box.style.width=b.w+'%'; box.style.height=b.h+'%';
       if(b.rot) box.style.transform=`rotate(${b.rot}deg)`;
-      // 박스 너비(%)를 실제 픽셀로 변환 후 폰트 크기 계산
-      const boxWidthPx = effectiveCW * (b.w / 100);
-      const fName = Math.max(6, Math.min(96, boxWidthPx * 0.15)); // 박스 너비의 15% ± 클램핑(6-96px)
+      const cH = container.offsetHeight || cW;
+      const boxHeightPx = cH * (b.h / 100);
+      const fName = Math.max(6, Math.min(96, boxHeightPx * 0.42));
       const ta = b.textAlign || 'left';
       // 동+호수로 정확 매칭 (하위호환: dong/hosu 없으면 key를 호수로 사용)
       const ho = b.hosu || key;
@@ -2380,7 +2381,8 @@ function edAddAxis(copyFromId) {
   edAxisCounter++;
   const id = 'axis_' + Date.now();
   const name = '축' + edAxisCounter;
-  let axis = { id, name, x: 30, y: 50, angle: 0, side: 'right', textAlign: 'left' };
+  const defLen = edImgNW > 0 ? Math.max(edImgNW, edImgNH) * 0.4 : 300;
+  let axis = { id, name, x: 30, y: 50, angle: 0, side: 'right', textAlign: 'left', lenA: defLen, lenB: defLen };
   if (copyFromId) {
     const src = edAxes.find(a => a.id === copyFromId);
     if (src) {
@@ -2389,6 +2391,8 @@ function edAddAxis(copyFromId) {
       axis.textAlign = src.textAlign;
       axis.x = Math.min(95, src.x + 15);
       axis.y = src.y;
+      axis.lenA = src.lenA ?? defLen;
+      axis.lenB = src.lenB ?? defLen;
     }
   }
   edAxes.push(axis);
@@ -2420,7 +2424,7 @@ function edSetAxisSide(id, side) {
 }
 
 function edSetAxisAngleVal(id, val) {
-  const angle = Math.round((parseInt(val) || 0) / 5) * 5; // 5° 스냅
+  const angle = Math.round(parseFloat(val) || 0); // 1° 정밀도 (사이드바 입력)
   const axis = edAxes.find(a => a.id === id);
   if (!axis) return;
   axis.angle = angle;
@@ -2488,8 +2492,8 @@ function edRenderAxisControls() {
     const row = document.createElement('div');
     row.className = 'ed-axis-row' + (isActive ? ' active' : '');
     row.innerHTML = `
-      <input class="ed-axis-angle-inp" type="number" value="${axis.angle}" step="5" min="-360" max="360"
-        onchange="edSetAxisAngleVal('${axis.id}',this.value)" title="각도(°) — 0=세로, 90=가로">
+      <input class="ed-axis-angle-inp" type="number" value="${axis.angle}" step="1" min="-360" max="360"
+        onchange="edSetAxisAngleVal('${axis.id}',this.value)" title="각도(°) — 0=세로, 90=가로 (1° 단위)">
       <span style="font-size:9px;color:var(--text3)">°</span>
       <div class="ed-axis-side-seg">
         <button class="ed-axis-side-btn${axis.side==='left'?' active':''}" onclick="edSetAxisSide('${axis.id}','left')" title="좌측 배치(우변이 축에 접촉)">좌</button>
@@ -2544,19 +2548,21 @@ function edUpdateAlignGuide() {
     const axY = axis.y / 100 * edImgNH;
     const rad = axis.angle * Math.PI / 180;
     const sinA = Math.sin(rad), cosA = Math.cos(rad);
-    const ext = Math.max(edImgNW, edImgNH) * 1.5;
+    const defLen = Math.max(edImgNW, edImgNH) * 0.4;
+    const lenA = axis.lenA ?? defLen;
+    const lenB = axis.lenB ?? defLen;
     const lineColor = isActive ? '#f97316' : '#94a3b8';
     const strokeW = isActive ? 2 : 1.5;
 
-    // 축 선
+    // 축 선 (lenA = 음방향, lenB = 양방향)
     const line = document.createElementNS('http://www.w3.org/2000/svg','line');
-    line.setAttribute('x1', axX - sinA*ext); line.setAttribute('y1', axY - cosA*ext);
-    line.setAttribute('x2', axX + sinA*ext); line.setAttribute('y2', axY + cosA*ext);
+    line.setAttribute('x1', axX - sinA*lenA); line.setAttribute('y1', axY - cosA*lenA);
+    line.setAttribute('x2', axX + sinA*lenB); line.setAttribute('y2', axY + cosA*lenB);
     line.setAttribute('stroke', lineColor); line.setAttribute('stroke-width', strokeW);
     line.setAttribute('stroke-dasharray', '6,4');
     line.setAttribute('class','axis-line-hit');
     line.style.cursor = 'pointer';
-    line.addEventListener('click', () => edSelectAxis(axis.id));
+    line.addEventListener('click', () => edToggleAxisActive(axis.id));
     svg.appendChild(line);
 
     // 앵커 핸들 (이동)
@@ -2580,13 +2586,14 @@ function edUpdateAlignGuide() {
     });
     svg.appendChild(anchor);
 
-    // 회전 핸들 (축 위쪽 끝)
-    const HLEN = Math.min(60, edImgNH*0.15);
+    // 회전 핸들 (앵커에서 lenA 방향 끝)
+    const HLEN = lenA * 0.8;
     const rhx = axX - sinA*HLEN, rhy = axY - cosA*HLEN;
     const rotH = document.createElementNS('http://www.w3.org/2000/svg','circle');
     rotH.setAttribute('cx', rhx); rotH.setAttribute('cy', rhy); rotH.setAttribute('r', isActive ? 6 : 4);
     rotH.setAttribute('fill','#fff'); rotH.setAttribute('stroke', lineColor); rotH.setAttribute('stroke-width','2');
     rotH.setAttribute('class','axis-rot-handle');
+    rotH.style.cursor = 'grab';
     rotH.addEventListener('mousedown', (e) => {
       e.preventDefault(); e.stopPropagation();
       edSelectAxis(axis.id);
@@ -2596,8 +2603,7 @@ function edUpdateAlignGuide() {
         const my = (ev.clientY - wrRect.top) / edZoom;
         const dx = mx - axX, dy = my - axY;
         const rawAngle = Math.atan2(-dx, -dy) * 180 / Math.PI;
-        axis.angle = Math.round(rawAngle / 5) * 5;
-        const inp = document.querySelector(`#edAxesContainer [class*="ed-axis-row"] input`);
+        axis.angle = Math.round(rawAngle / 5) * 5; // 드래그: 5° 스냅 유지
         edAxes.forEach((a,i) => {
           const inps = document.querySelectorAll('.ed-axis-angle-inp');
           if (inps[i] && a.id === axis.id) inps[i].value = axis.angle;
@@ -2609,6 +2615,46 @@ function edUpdateAlignGuide() {
       document.addEventListener('mousemove',move); document.addEventListener('mouseup',up);
     });
     svg.appendChild(rotH);
+
+    // 끝점 핸들 A (음방향 끝 — 드래그로 lenA 조절)
+    const endAx = axX - sinA*lenA, endAy = axY - cosA*lenA;
+    const endA = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    endA.setAttribute('cx', endAx); endA.setAttribute('cy', endAy); endA.setAttribute('r', 5);
+    endA.setAttribute('fill', '#fff'); endA.setAttribute('stroke', lineColor); endA.setAttribute('stroke-width', 2);
+    endA.style.cursor = 'ns-resize';
+    endA.addEventListener('mousedown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const startX = e.clientX, startY = e.clientY, startLen = lenA;
+      const move = (ev) => {
+        const dxPx = (ev.clientX - startX) / edZoom, dyPx = (ev.clientY - startY) / edZoom;
+        const delta = -(dxPx * sinA + dyPx * cosA); // 음방향으로 늘어나므로 부호 반전
+        axis.lenA = Math.max(20, startLen + delta);
+        edUpdateAlignGuide();
+      };
+      const up = () => { document.removeEventListener('mousemove',move); document.removeEventListener('mouseup',up); };
+      document.addEventListener('mousemove',move); document.addEventListener('mouseup',up);
+    });
+    svg.appendChild(endA);
+
+    // 끝점 핸들 B (양방향 끝 — 드래그로 lenB 조절)
+    const endBx = axX + sinA*lenB, endBy = axY + cosA*lenB;
+    const endB = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    endB.setAttribute('cx', endBx); endB.setAttribute('cy', endBy); endB.setAttribute('r', 5);
+    endB.setAttribute('fill', '#fff'); endB.setAttribute('stroke', lineColor); endB.setAttribute('stroke-width', 2);
+    endB.style.cursor = 'ns-resize';
+    endB.addEventListener('mousedown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const startX = e.clientX, startY = e.clientY, startLen = lenB;
+      const move = (ev) => {
+        const dxPx = (ev.clientX - startX) / edZoom, dyPx = (ev.clientY - startY) / edZoom;
+        const delta = dxPx * sinA + dyPx * cosA;
+        axis.lenB = Math.max(20, startLen + delta);
+        edUpdateAlignGuide();
+      };
+      const up = () => { document.removeEventListener('mousemove',move); document.removeEventListener('mouseup',up); };
+      document.addEventListener('mousemove',move); document.addEventListener('mouseup',up);
+    });
+    svg.appendChild(endB);
 
     // 라벨
     const lbl = document.createElementNS('http://www.w3.org/2000/svg','text');
@@ -2866,7 +2912,9 @@ function edLoadGroup(bName, gName) {
 
   // 방향 라벨 복원
   edDirLabels = Object.assign({ top:'', bottom:'', left:'', right:'' }, saved.dirLabels || {});
+  edDirOffsets = Object.assign({ top:0, bottom:0, left:0, right:0 }, saved.dirOffsets || {});
   edApplyDirLabels();
+  edApplyDirOffsets();
 
   edActiveDong = '전체';
   edRenderGroupTabs(bName);
@@ -3663,6 +3711,56 @@ function edRotateImage(dir) {
 
 // ── 방향 설명 라벨 ──
 let edDirLabels = { top: '', bottom: '', left: '', right: '' };
+let edDirOffsets = { top: 0, bottom: 0, left: 0, right: 0 };
+
+function edApplyDirOffsets() {
+  ['top', 'bottom'].forEach(s => {
+    const btn = document.getElementById('edDirBtn-' + s);
+    if (!btn) return;
+    const off = edDirOffsets[s] || 0;
+    btn.style.left = `calc(50% + ${off}px)`;
+    btn.style.transform = 'translateX(-50%)';
+  });
+  ['left', 'right'].forEach(s => {
+    const btn = document.getElementById('edDirBtn-' + s);
+    if (!btn) return;
+    const off = edDirOffsets[s] || 0;
+    btn.style.top = `calc(50% + ${off}px)`;
+    btn.style.transform = 'translateY(-50%)';
+  });
+}
+
+function edInitDirDrag() {
+  if (edInitDirDrag._done) return;
+  edInitDirDrag._done = true;
+  ['top', 'bottom', 'left', 'right'].forEach(dir => {
+    const btn = document.getElementById('edDirBtn-' + dir);
+    if (!btn) return;
+    btn.style.cursor = 'move';
+    btn.addEventListener('mousedown', e => {
+      if (e.button !== 0) return;
+      e.preventDefault(); e.stopPropagation();
+      const isHoriz = dir === 'top' || dir === 'bottom';
+      const startMouse = isHoriz ? e.clientX : e.clientY;
+      const startOff = edDirOffsets[dir] || 0;
+      let moved = false;
+      const onMove = ev => {
+        const delta = isHoriz ? (ev.clientX - startMouse) : (ev.clientY - startMouse);
+        if (Math.abs(delta) > 4) moved = true;
+        if (!moved) return;
+        edDirOffsets[dir] = startOff + delta;
+        edApplyDirOffsets();
+      };
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        if (!moved) edShowDirInput(dir);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  });
+}
 
 function edShowDirInput(dir) {
   const label = { top: '상단', bottom: '하단', left: '좌측', right: '우측' }[dir];
@@ -3831,9 +3929,8 @@ function edRenderAllBoxes() {
     const ta = b.textAlign || 'left';
     const rotDeg = b.rot || 0;
     const displayName = b.unit?.상호명 || b.name || b.unit?.호수 || bkey;
-    // 박스 너비 기반 폰트 크기 (전체지도와 동일한 로직)
-    const boxWidthPx = effectiveW * (b.w / 100);
-    const fName = Math.max(6, Math.min(96, boxWidthPx * 0.15));
+    const boxHeightPx = (edImgNH * edZoom) * (b.h / 100);
+    const fName = Math.max(6, Math.min(96, boxHeightPx * 0.42));
     el.innerHTML = `<div class="obox-hosu">${b.unit?.호수||bkey}</div><div class="obox-name" style="text-align:${ta};font-size:${fName}px">${displayName}</div><div class="obox-del">✕</div><div class="obox-rotate-label">${rotDeg}°</div><div class="obox-rotate" title="드래그하여 회전">↻</div><div class="obox-resize"></div>`;
     el.querySelector('.obox-del').addEventListener('click',ev=>{ev.stopPropagation();delete edBoxes[bkey];edRenderAllBoxes();edRenderUnitList();});
     el.querySelector('.obox-rotate').addEventListener('mousedown',edStartRotate);
@@ -3870,12 +3967,17 @@ function edStartDrag(e) {
   window.addEventListener('mousemove',move);window.addEventListener('mouseup',up);
 }
 function edStartResize(e) {
-  e.preventDefault();e.stopPropagation();
-  const el=e.currentTarget.parentElement,bkey=el.dataset.bkey,b=edBoxes[bkey];
-  const sd={bkey,el,sx:e.clientX,sy:e.clientY,ow:b.w,oh:b.h};
-  const move=ev=>{const dw=(ev.clientX-sd.sx)/(edImgNW*edZoom)*100,dh=(ev.clientY-sd.sy)/(edImgNH*edZoom)*100;edBoxes[sd.bkey].w=Math.max(2,sd.ow+dw);edBoxes[sd.bkey].h=Math.max(1.5,sd.oh+dh);sd.el.style.width=edBoxes[sd.bkey].w+'%';sd.el.style.height=edBoxes[sd.bkey].h+'%';};
-  const up=()=>{window.removeEventListener('mousemove',move);window.removeEventListener('mouseup',up);};
-  window.addEventListener('mousemove',move);window.addEventListener('mouseup',up);
+  e.preventDefault(); e.stopPropagation();
+  const el = e.currentTarget.parentElement, bkey = el.dataset.bkey, b = edBoxes[bkey];
+  const sd = { bkey, el, sx: e.clientX, ow: b.w };
+  const move = ev => {
+    const dw = (ev.clientX - sd.sx) / (edImgNW * edZoom) * 100;
+    edBoxes[sd.bkey].w = Math.max(2, sd.ow + dw);
+    sd.el.style.width = edBoxes[sd.bkey].w + '%';
+    // 폰트는 높이 기준이므로 너비 변경 시 자동으로 일정 유지 (재렌더 불필요)
+  };
+  const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+  window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
 }
 
 function edStartRotate(e) {
@@ -3974,6 +4076,7 @@ function edSaveToMap(){
       groupName: gName,
       imgDataURL,
       dirLabels: { ...edDirLabels },
+      dirOffsets: { ...edDirOffsets },
       cardDisplayScale: edCardDisplayScale,
       savedAt: new Date().toISOString()
     };
