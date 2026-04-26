@@ -422,6 +422,8 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
 .ed-axis-side-seg{display:flex;gap:1px;background:var(--paper);border-radius:4px;padding:1px;border:1.5px solid var(--line)}
 .ed-axis-side-btn{width:28px;height:20px;font-size:10px;font-weight:600;border:none;background:transparent;color:var(--text2);border-radius:3px;cursor:pointer;font-family:inherit;transition:all .1s}
 .ed-axis-side-btn.active{background:#f97316;color:#fff}
+.ed-axis-onoff-btn{height:22px;padding:0 5px!important;font-size:10px;font-weight:700;border:1.5px solid var(--line);border-radius:4px;background:var(--paper);color:var(--text3);cursor:pointer;flex-shrink:0;font-family:inherit;transition:all .1s}
+.ed-axis-onoff-btn.on{background:#f97316;border-color:#f97316;color:#fff}
 .ed-axis-add-btn{width:22px;height:22px;padding:0!important;font-size:13px;line-height:1;border-radius:4px!important;flex-shrink:0;color:#f97316!important;border-color:#fed7aa!important;background:#fff7ed!important}
 .ed-axis-del-btn{width:22px;height:22px;padding:0!important;font-size:11px;line-height:1;border-radius:4px!important;flex-shrink:0;color:var(--text3)!important}
 /* SVG 축 오버레이 */
@@ -2409,8 +2411,12 @@ function edSetAxisSide(id, side) {
   const axis = edAxes.find(a => a.id === id);
   if (!axis) return;
   axis.side = side;
-  axis.textAlign = side === 'left' ? 'right' : 'left'; // 좌측 배치 → 텍스트 우정렬, 우측 배치 → 좌정렬
+  axis.textAlign = side === 'left' ? 'right' : 'left';
+  // 이 축에 붙은 박스들의 side도 동기화
+  Object.values(edBoxes).forEach(b => { if (b.axisId === id) b.axisSide = side; });
+  edUpdateAxisBoxPositions(id);
   edRenderAxisControls();
+  edRenderAllBoxes();
 }
 
 function edSetAxisAngleVal(id, val) {
@@ -2423,27 +2429,35 @@ function edSetAxisAngleVal(id, val) {
   edRenderAllBoxes();
 }
 
-// 박스 위치를 axis 파라미터에서 계산
-function edBoxPosFromAxis(axis, axisT, axisSide, boxW) {
+// 박스 위치를 axis 파라미터에서 계산 (픽셀 단위로 계산 후 %로 변환)
+// axisT_px: 축 방향으로의 오프셋(픽셀), boxW_pct: 박스 폭(%)
+function edBoxPosFromAxis(axis, axisT_px, axisSide, boxW_pct) {
   const rad = axis.angle * Math.PI / 180;
   const sinA = Math.sin(rad), cosA = Math.cos(rad);
   const perpSign = axisSide === 'right' ? 1 : -1;
-  const perpHalf = perpSign * (boxW / 2);
+  const boxW_px = boxW_pct / 100 * edImgNW;
+  const perpHalf_px = perpSign * (boxW_px / 2);
+  const axX_px = axis.x / 100 * edImgNW;
+  const axY_px = axis.y / 100 * edImgNH;
+  // 박스 중심 좌표 (픽셀)
+  const cx_px = axX_px + perpHalf_px * cosA + axisT_px * sinA;
+  const cy_px = axY_px - perpHalf_px * sinA + axisT_px * cosA;
   return {
-    x: axis.x + perpHalf * cosA + axisT * sinA,
-    y: axis.y - perpHalf * sinA + axisT * cosA,
+    x: cx_px / edImgNW * 100,
+    y: cy_px / edImgNH * 100,
     rot: -axis.angle
   };
 }
 
-// 클릭 좌표를 축 로컬 좌표로 투영
-function edProjectToAxis(axis, cx, cy) {
+// 클릭 좌표(%)를 축 로컬 좌표로 투영 — 픽셀 공간에서 계산해야 정확
+function edProjectToAxis(axis, cx_pct, cy_pct) {
   const rad = axis.angle * Math.PI / 180;
   const sinA = Math.sin(rad), cosA = Math.cos(rad);
-  const dx = cx - axis.x, dy = cy - axis.y;
+  const dxPx = (cx_pct - axis.x) / 100 * edImgNW;
+  const dyPx = (cy_pct - axis.y) / 100 * edImgNH;
   return {
-    axisT: dx * sinA + dy * cosA,
-    perpDist: dx * cosA - dy * sinA
+    axisT: dxPx * sinA + dyPx * cosA,    // 픽셀 단위, 축 방향 거리
+    perpDist: dxPx * cosA - dyPx * sinA   // 픽셀 단위, 축 수직 거리
   };
 }
 
@@ -2481,35 +2495,26 @@ function edRenderAxisControls() {
         <button class="ed-axis-side-btn${axis.side==='left'?' active':''}" onclick="edSetAxisSide('${axis.id}','left')" title="좌측 배치(우변이 축에 접촉)">좌</button>
         <button class="ed-axis-side-btn${axis.side==='right'?' active':''}" onclick="edSetAxisSide('${axis.id}','right')" title="우측 배치(좌변이 축에 접촉)">우</button>
       </div>
+      <button class="ed-axis-onoff-btn${isActive ? ' on' : ''}" onclick="edToggleAxisActive('${axis.id}')" title="이 기준선 활성화 ON/OFF — ON일 때 새 박스가 이 기준선에 붙음">${isActive ? 'ON' : 'OFF'}</button>
       <button class="btn ed-axis-add-btn" onclick="edAddAxis('${axis.id}')" title="${axis.name} 복사해 새 축 추가">＋</button>
       <button class="btn ed-axis-del-btn" onclick="edRemoveAxis('${axis.id}')" title="${axis.name} 삭제">✕</button>`;
-    row.addEventListener('click', (e) => { if (!e.target.closest('input,button')) edSelectAxis(axis.id); });
+    row.addEventListener('click', (e) => { if (!e.target.closest('input,button')) edToggleAxisActive(axis.id); });
     container.appendChild(row);
   });
 }
 
-function edReattachAllBoxesToAxis(id) {
-  const axis = edAxes.find(a => a.id === id);
-  if (!axis) return;
-  Object.values(edBoxes).forEach(b => {
-    const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
-    const proj = edProjectToAxis(axis, cx, cy);
-    b.axisId = id;
-    b.axisT = proj.axisT;
-    b.axisSide = proj.perpDist >= 0 ? 'right' : 'left';
-    const pos = edBoxPosFromAxis(axis, b.axisT, b.axisSide, b.w);
-    b.x = Math.max(0, Math.min(99 - b.w, pos.x - b.w / 2));
-    b.y = Math.max(0, Math.min(99 - b.h, pos.y - b.h / 2));
-    b.rot = pos.rot;
-  });
-}
-
-function edSelectAxis(id) {
-  edActiveAxisId = id;
-  edReattachAllBoxesToAxis(id);
+// 축 활성화 토글: 이미 활성이면 비활성(자유 배치), 아니면 활성화
+function edToggleAxisActive(id) {
+  edActiveAxisId = (edActiveAxisId === id) ? null : id;
   edRenderAxisControls();
   edUpdateAlignGuide();
-  edRenderAllBoxes();
+}
+
+// (호환성 유지용 - 직접 활성화)
+function edSelectAxis(id) {
+  edActiveAxisId = id;
+  edRenderAxisControls();
+  edUpdateAlignGuide();
 }
 
 // ── 정렬 가이드라인(SVG) 렌더 ──
