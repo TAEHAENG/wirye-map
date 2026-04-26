@@ -304,6 +304,7 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
 .crop-box .crop-handle.br{bottom:-6px;right:-6px;cursor:se-resize}
 /* 여백 경계선 — 드래그 가능 */
 .crop-pad-line{position:absolute;background:#ef4444;z-index:50;pointer-events:auto;box-shadow:0 0 4px rgba(239,68,68,0.5);transition:background .1s}
+#edPadLinesWrap .crop-pad-line{z-index:31}
 .crop-pad-line:hover,.crop-pad-line.dragging{background:#b91c1c;box-shadow:0 0 8px rgba(239,68,68,0.8)}
 .crop-pad-line.top,.crop-pad-line.bottom{width:100%;height:4px;cursor:ns-resize;left:0}
 .crop-pad-line.left,.crop-pad-line.right{width:4px;height:100%;cursor:ew-resize;top:0}
@@ -339,7 +340,11 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
 /* Editor Canvas */
 .ed-canvas-area{flex:1;overflow:auto;background:#e8eaf0;background-image:radial-gradient(circle,#c8cde0 1px,transparent 1px);background-size:20px 20px;position:relative}
 .ed-canvas-scroller{min-width:100%;min-height:100%;display:flex;align-items:flex-start;justify-content:flex-start;padding:24px}
-.ed-canvas-wrapper{position:relative;display:inline-block;box-shadow:var(--shadow-lg);border-radius:2px;cursor:crosshair;user-select:none;flex-shrink:0;overflow:hidden;background:#f9fafb}
+.ed-canvas-wrapper{position:relative;display:inline-block;box-shadow:var(--shadow-lg);border-radius:2px;cursor:crosshair;user-select:none;flex-shrink:0;overflow:visible;background:#f9fafb}
+#edPadLinesWrap{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:30;overflow:visible}
+#edPadApplyBar{position:absolute;bottom:70px;right:16px;z-index:60;background:rgba(255,255,255,.97);border:1.5px solid #ef4444;border-radius:8px;padding:5px 10px;display:none;gap:6px;align-items:center;box-shadow:0 4px 12px rgba(0,0,0,.18)}
+#edPadApplyBar span{font-size:11px;color:#ef4444;font-weight:700}
+#edPadApplyBar button{padding:3px 9px;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit}
 #ed-floorplan-img{display:block;max-width:100%;height:auto;cursor:grab;user-select:none}
 #ed-img-resize-handle{position:absolute;bottom:0;right:0;width:16px;height:16px;background:#2563eb;border-radius:1px;cursor:nwse-resize;opacity:0.8;z-index:100;display:none}
 /* 방향 설명 버튼 */
@@ -635,7 +640,6 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
               <input type="file" id="edComposeInput" accept="image/*" multiple style="display:none" onchange="edStartCompose(this);closeEdImgMenu()">
               <div class="ed-img-menu-sep"></div>
               <button onclick="closeEdImgMenu();edStartCrop('crop')">✂️ 크롭</button>
-              <button onclick="closeEdImgMenu();edStartCrop('pad')">📐 여백 추가</button>
               <div class="ed-img-menu-sep"></div>
               <button onclick="closeEdImgMenu();edRotateImage('ccw')">↺ 90° 반시계</button>
               <button onclick="closeEdImgMenu();edRotateImage('cw')">↻ 90° 시계</button>
@@ -753,8 +757,21 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
               📍 카드 크기: <span id="edCardGuideDims">0×0</span>px
             </div>
           </div>
+          <!-- 항상 표시되는 여백 경계선 -->
+          <div id="edPadLinesWrap" style="display:none">
+            <div class="crop-pad-line top" id="edPermPadLine_top"><div class="crop-pad-line-label"></div></div>
+            <div class="crop-pad-line bottom" id="edPermPadLine_bottom"><div class="crop-pad-line-label"></div></div>
+            <div class="crop-pad-line left" id="edPermPadLine_left"><div class="crop-pad-line-label"></div></div>
+            <div class="crop-pad-line right" id="edPermPadLine_right"><div class="crop-pad-line-label"></div></div>
+          </div>
           <!-- 열 정렬 가이드라인 (JS로 추가됨) -->
         </div>
+      </div>
+      <!-- 여백 적용 바 (여백 값이 0 이상일 때 표시) -->
+      <div id="edPadApplyBar">
+        <span>여백</span>
+        <button onclick="edApplyPadLines()" style="background:#ef4444;color:#fff">✓ 적용</button>
+        <button onclick="edResetPadLines()" style="background:#f3f4f6;color:#333">↺</button>
       </div>
       <!-- 대각선 위젯 제거됨 — 박스 개별 회전 핸들로 대체 -->
       <div class="ed-zoom-bar" id="edZoomBar" style="display:none">
@@ -2461,7 +2478,6 @@ function edRenderAxisControls() {
     const row = document.createElement('div');
     row.className = 'ed-axis-row' + (isActive ? ' active' : '');
     row.innerHTML = `
-      <span class="ed-axis-name" style="cursor:pointer" onclick="edSelectAxis('${axis.id}')">${axis.name}</span>
       <input class="ed-axis-angle-inp" type="number" value="${axis.angle}" step="5" min="-360" max="360"
         onchange="edSetAxisAngleVal('${axis.id}',this.value)" title="각도(°) — 0=세로, 90=가로">
       <span style="font-size:9px;color:var(--text3)">°</span>
@@ -2497,8 +2513,8 @@ function edUpdateAlignGuide() {
     svg.id = 'edAxisSVG';
     wr.appendChild(svg);
   }
-  svg.setAttribute('width', edImgNW);
-  svg.setAttribute('height', edImgNH);
+  svg.setAttribute('width', edImgNW * edZoom);
+  svg.setAttribute('height', edImgNH * edZoom);
   svg.setAttribute('viewBox', `0 0 ${edImgNW} ${edImgNH}`);
   svg.innerHTML = '';
   if (!edBoxMode || edAxes.length === 0) return;
@@ -2822,6 +2838,8 @@ function edLoadGroup(bName, gName) {
       edApplyZoom(); edRenderAllBoxes(); edUpdateAlignGuide(); edApplyDirLabels();
       updateCardDisplayGuide(); // 카드 가이드 표시
       edSetupImageDragResize();
+      edCropPad = { top:0, bottom:0, left:0, right:0 };
+      edShowPadLines();
     };
     document.getElementById('edCanvasWrapper').removeEventListener('click', edOnCanvasClick);
     document.getElementById('edCanvasWrapper').addEventListener('click', edOnCanvasClick);
@@ -2863,6 +2881,8 @@ function edHandleImage(input) {
     edUpdateAlignGuide();
     updateCardDisplayGuide(); // 카드 가이드 표시
     edSetupImageDragResize(); // 드래그 기능 활성화
+    edCropPad = { top:0, bottom:0, left:0, right:0 };
+    edShowPadLines();
   };
   const _wrap = document.getElementById('edCanvasWrapper');
   if (!_wrap._clickBound) { _wrap.addEventListener('click', edOnCanvasClick); _wrap._clickBound = true; }
@@ -3131,6 +3151,8 @@ function edComposeApply() {
     edApplyZoom(); edRenderAllBoxes();
     edUpdateAlignGuide();
     edSetupImageDragResize(); // 드래그 기능 활성화
+    edCropPad = { top:0, bottom:0, left:0, right:0 };
+    edShowPadLines();
   };
   const wrap = document.getElementById('edCanvasWrapper');
   if (!wrap._clickBound) { wrap.addEventListener('click', edOnCanvasClick); wrap._clickBound = true; }
@@ -3228,6 +3250,137 @@ function edBindPadLineDrag(side) {
   });
 }
 
+// ── 항상 표시 여백 경계선 ──
+function edUpdatePermPadLine(side) {
+  const line = document.getElementById('edPermPadLine_' + side);
+  if (!line) return;
+  const dW = edImgNW * edZoom, dH = edImgNH * edZoom;
+  const padPx = edCropPad[side];
+  const isHoriz = side === 'top' || side === 'bottom';
+  const dim = isHoriz ? dH : dW;
+  const padPct = dim > 0 ? (padPx / dim) * 100 : 0;
+  if (side === 'top')         line.style.top = (-padPct) + '%';
+  else if (side === 'bottom') line.style.top = (100 + padPct) + '%';
+  else if (side === 'left')   line.style.left = (-padPct) + '%';
+  else                        line.style.left = (100 + padPct) + '%';
+  let lbl = line.querySelector('.crop-pad-line-label');
+  if (!lbl) { lbl = document.createElement('div'); lbl.className = 'crop-pad-line-label'; line.appendChild(lbl); }
+  const arrow = side === 'top' ? '↑' : side === 'bottom' ? '↓' : side === 'left' ? '←' : '→';
+  lbl.textContent = `${arrow} ${padPx > 0 ? '+' : ''}${padPx}px`;
+}
+
+function edSyncPermPadLines() {
+  const wrap = document.getElementById('edPadLinesWrap');
+  if (!wrap || wrap.style.display === 'none') return;
+  EDCROP_SIDES.forEach(s => edUpdatePermPadLine(s));
+}
+
+function edBindPermPadLineDrag(side) {
+  const line = document.getElementById('edPermPadLine_' + side);
+  if (!line || line._bound) return;
+  line._bound = true;
+  const isVert = side === 'top' || side === 'bottom';
+  line.addEventListener('mousedown', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    line.classList.add('dragging');
+    const startPx = isVert ? e.clientY : e.clientX;
+    const startPad = edCropPad[side];
+    function move(ev) {
+      const delta = (isVert ? ev.clientY - startPx : ev.clientX - startPx) / edZoom;
+      let newPad;
+      if (side === 'top')         newPad = Math.round(startPad - delta);
+      else if (side === 'bottom') newPad = Math.round(startPad + delta);
+      else if (side === 'left')   newPad = Math.round(startPad - delta);
+      else                        newPad = Math.round(startPad + delta);
+      edCropPad[side] = Math.max(0, Math.min(800, newPad));
+      edUpdatePermPadLine(side);
+      edUpdatePadApplyBar();
+    }
+    function up() {
+      line.classList.remove('dragging');
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+    }
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+  });
+}
+
+function edShowPadLines() {
+  if (!edImageURL) return;
+  const wrap = document.getElementById('edPadLinesWrap');
+  if (!wrap) return;
+  wrap.style.display = '';
+  EDCROP_SIDES.forEach(s => {
+    edUpdatePermPadLine(s);
+    edBindPermPadLineDrag(s);
+  });
+  edUpdatePadApplyBar();
+}
+
+function edHidePadLines() {
+  const wrap = document.getElementById('edPadLinesWrap');
+  if (wrap) wrap.style.display = 'none';
+  const bar = document.getElementById('edPadApplyBar');
+  if (bar) bar.style.display = 'none';
+}
+
+function edUpdatePadApplyBar() {
+  const bar = document.getElementById('edPadApplyBar');
+  if (!bar) return;
+  const hasChanges = Object.values(edCropPad).some(v => v !== 0);
+  bar.style.display = hasChanges ? 'flex' : 'none';
+}
+
+function edApplyPadLines() {
+  if (!edImageURL) return;
+  const img = document.getElementById('ed-floorplan-img');
+  const srcW = img.naturalWidth, srcH = img.naturalHeight;
+  const { top:padT, bottom:padB, left:padL, right:padR } = edCropPad;
+  const outW = srcW + padL + padR, outH = srcH + padT + padB;
+  if (outW <= 0 || outH <= 0) { showToast('유효하지 않은 여백 값'); return; }
+  const cvs = document.createElement('canvas');
+  cvs.width = outW; cvs.height = outH;
+  const ctx = cvs.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, outW, outH);
+  ctx.drawImage(img, 0, 0, srcW, srcH, padL, padT, srcW, srcH);
+  // 박스 좌표 재계산
+  for (const key of Object.keys(edBoxes)) {
+    const b = edBoxes[key];
+    const absX = b.x / 100 * srcW + padL;
+    const absY = b.y / 100 * srcH + padT;
+    b.x = absX / outW * 100;
+    b.y = absY / outH * 100;
+    b.w = b.w / 100 * srcW / outW * 100;
+    b.h = b.h / 100 * srcH / outH * 100;
+  }
+  // 축 좌표 재계산
+  edAxes.forEach(axis => {
+    axis.x = (axis.x / 100 * srcW + padL) / outW * 100;
+    axis.y = (axis.y / 100 * srcH + padT) / outH * 100;
+  });
+  const supportsWebP = cvs.toDataURL('image/webp').startsWith('data:image/webp');
+  const dataURL = supportsWebP ? cvs.toDataURL('image/webp', 0.95) : cvs.toDataURL('image/png');
+  const input = document.getElementById('edImgInput');
+  if (input) input.value = '';
+  edImageURL = dataURL;
+  img.src = dataURL;
+  edCropPad = { top:0, bottom:0, left:0, right:0 };
+  img.onload = () => {
+    edImgNW = img.naturalWidth; edImgNH = img.naturalHeight;
+    edApplyZoom(); edRenderAllBoxes(); edUpdateAlignGuide();
+    edShowPadLines();
+  };
+  showToast(`📐 여백 추가 — ${outW}×${outH}px (↑${padT} ↓${padB} ←${padL} →${padR})`);
+}
+
+function edResetPadLines() {
+  edCropPad = { top:0, bottom:0, left:0, right:0 };
+  EDCROP_SIDES.forEach(s => edUpdatePermPadLine(s));
+  edUpdatePadApplyBar();
+}
+
 // 편집 모드 — 'crop' (자르기만) / 'pad' (여백만) / 'both' (기존 방식)
 let edCropMode = 'both';
 function edStartCrop(mode) {
@@ -3235,6 +3388,8 @@ function edStartCrop(mode) {
   edCropMode = mode || 'both';
   const wrap = document.getElementById('edCanvasWrapper');
   if (wrap.querySelector('.crop-overlay')) return;
+  edHidePadLines();
+  wrap.style.overflow = 'hidden';
 
   // 모드별 초기값 세팅
   if (edCropMode === 'crop') {
@@ -3341,6 +3496,9 @@ function edStartCrop(mode) {
 function edCancelCrop() {
   const ov = document.querySelector('#edCanvasWrapper .crop-overlay');
   if (ov) ov.remove();
+  const wrap = document.getElementById('edCanvasWrapper');
+  if (wrap) wrap.style.overflow = 'visible';
+  edShowPadLines();
 }
 
 function edApplyCrop() {
@@ -3397,6 +3555,7 @@ function edApplyCrop() {
     edApplyZoom(); edRenderAllBoxes(); edUpdateAlignGuide();
   };
 
+  edCropPad = { top:0, bottom:0, left:0, right:0 };
   edCancelCrop();
   const msg = edCropMode === 'pad'
     ? `📐 여백 추가 — ${outW}×${outH}px (↑${padT} ↓${padB} ←${padL} →${padR})`
@@ -3473,6 +3632,8 @@ function edRotateImage(dir) {
   img.onload = () => {
     edImgNW = img.naturalWidth; edImgNH = img.naturalHeight;
     edApplyZoom(); edRenderAllBoxes(); edUpdateAlignGuide(); edApplyDirLabels();
+    edCropPad = { top:0, bottom:0, left:0, right:0 };
+    edShowPadLines();
   };
   showToast(dir === 'cw' ? '↻ 시계방향 90° 회전' : '↺ 반시계방향 90° 회전');
 }
@@ -3727,6 +3888,8 @@ function edApplyZoom(){
   img.style.width=(edImgNW*edZoom)+'px';
   img.style.height=(edImgNH*edZoom)+'px';
   document.getElementById('edZoomVal').textContent=Math.round(edZoom*100)+'%';
+  edUpdateAlignGuide();
+  edSyncPermPadLines();
 }
 
 // 이미지 드래그/리사이즈 설정 (현재는 기본 크기 맞추기만)
