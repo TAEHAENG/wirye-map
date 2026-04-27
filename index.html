@@ -66,7 +66,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--t
 .canvas{position:absolute;top:0;left:0;width:3000px;height:3000px;transform-origin:0 0}
 
 /* Building Card */
-.building-card{position:absolute;width:640px;min-width:400px;background:var(--paper2);border-radius:12px;border:2px solid #3b82f6;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;overflow:hidden;transition:box-shadow .15s,width .3s;user-select:none}
+.building-card{position:absolute;width:640px;min-width:400px;background:var(--paper2);border-radius:12px;border:1.5px solid var(--line);box-shadow:var(--shadow-lg);display:flex;flex-direction:column;overflow:hidden;transition:box-shadow .15s,width .3s;user-select:none}
 .building-card:hover{box-shadow:0 12px 40px rgba(0,0,0,.18)}
 .building-card.dragging{box-shadow:0 20px 60px rgba(37,99,235,.25);border-color:var(--blue-mid);z-index:100!important}
 .card-header{background:var(--blue);padding:10px 12px 8px;cursor:move;display:flex;flex-direction:column;gap:6px}
@@ -317,7 +317,7 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
 .crop-toolbar .crop-cancel{background:#f3f4f6;color:#333}
 .crop-toolbar-hint{font-size:10px;color:#6b7280;white-space:nowrap}
 /* 고화질 평면도 오버레이 */
-.card-fp-container{position:relative;width:100%;border-radius:6px;border:2px solid #ef4444;overflow:visible;background:#f8f9fe;cursor:pointer}
+.card-fp-container{position:relative;width:100%;border-radius:6px;border:1px solid var(--line);overflow:visible;background:#f8f9fe;cursor:pointer}
 .card-fp-container img{width:100%;display:block;image-rendering:auto}
 .card-fp-box{position:absolute;background:transparent;border:none;border-radius:0;overflow:visible;pointer-events:auto;display:flex;align-items:center;cursor:pointer}
 .card-fp-box .fp-name{font-weight:800;color:#1a1c2a;text-align:left;line-height:1.2;white-space:nowrap;padding:2px 4px;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 6px #fff;pointer-events:none;width:100%;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis}
@@ -340,7 +340,7 @@ body > .detail-panel.fp-fullscreen-mode{position:fixed!important;top:0;right:0;b
 /* Editor Canvas */
 .ed-canvas-area{flex:1;overflow:auto;background:#e8eaf0;background-image:radial-gradient(circle,#c8cde0 1px,transparent 1px);background-size:20px 20px;position:relative}
 .ed-canvas-scroller{min-width:100%;min-height:100%;display:flex;align-items:flex-start;justify-content:flex-start;padding:24px}
-.ed-canvas-wrapper{position:relative;display:inline-block;box-shadow:var(--shadow-lg);border-radius:2px;cursor:crosshair;user-select:none;flex-shrink:0;overflow:visible;background:#f9fafb}
+.ed-canvas-wrapper{position:relative;display:inline-block;box-shadow:var(--shadow-lg);border-radius:2px;cursor:crosshair;user-select:none;flex-shrink:0;overflow:visible;background:#f9fafb;outline:2px solid #ef4444}
 #edPadLinesWrap{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:30;overflow:visible}
 #edPadApplyBar{position:absolute;bottom:70px;right:16px;z-index:60;background:rgba(255,255,255,.97);border:1.5px solid #ef4444;border-radius:8px;padding:5px 10px;display:none;gap:6px;align-items:center;box-shadow:0 4px 12px rgba(0,0,0,.18)}
 #edPadApplyBar span{font-size:11px;color:#ef4444;font-weight:700}
@@ -966,7 +966,6 @@ function switchPage(page) {
   if (page === 'editor') {
     refreshAllStorageStats(false);
     initEditorResizer();
-    edInitDirDrag();
   }
 }
 
@@ -1579,7 +1578,7 @@ function buildFloorplanView(bName, fp) {
       if(b.rot) box.style.transform=`rotate(${b.rot}deg)`;
       const cH = container.offsetHeight || cW;
       const boxHeightPx = cH * (b.h / 100);
-      const fName = Math.max(6, Math.min(96, boxHeightPx * 0.42));
+      const fName = Math.max(6, Math.min(96, boxHeightPx * 0.6));
       const ta = b.textAlign || 'left';
       // 동+호수로 정확 매칭 (하위호환: dong/hosu 없으면 key를 호수로 사용)
       const ho = b.hosu || key;
@@ -1609,13 +1608,19 @@ function buildFloorplanView(bName, fp) {
     // 방향 라벨 (상/하/좌/우)
     container.querySelectorAll('.ed-dir-label').forEach(el => el.remove());
     const dl = fp.dirLabels || {};
+    const doff = fp.dirOffsets || {};
+    const cHh = container.offsetHeight || cW;
     ['top','bottom','left','right'].forEach(s => {
       const txt = (dl[s] || '').trim();
       if (!txt) return;
+      const isHoriz = s === 'top' || s === 'bottom';
+      const offPx = (doff[s] || 0) * (isHoriz ? cW : cHh);
       const el = document.createElement('div');
       el.className = 'ed-dir-label ' + s;
       el.style.fontSize = Math.max(9, Math.round(10 * scale)) + 'px';
       el.textContent = txt;
+      if (isHoriz) { el.style.left = `calc(50% + ${offPx}px)`; el.style.transform = 'translateX(-50%)'; }
+      else { el.style.top = `calc(50% + ${offPx}px)`; el.style.transform = s === 'left' ? 'translateY(-50%) rotate(-90deg)' : 'translateY(-50%) rotate(90deg)'; }
       container.appendChild(el);
     });
   };
@@ -1865,16 +1870,13 @@ function openFloorplanFullscreen(bName, fp) {
     }
     renderFSBoxes._tries = 0;
     inner.querySelectorAll('.card-fp-box').forEach(el => el.remove());
-    // 박스 % 크기 기반으로 폰트 크기 계산 (이미지 크기와 무관하게 일정한 비율 유지)
-    const displayScale = (fp.cardDisplayScale || 100) / 100;
-    const effectiveW = dispW * displayScale;
+    const dispH = img.offsetHeight || dispW;
     for (const [key, b] of Object.entries(fp.boxes)) {
       const box = document.createElement('div'); box.className='card-fp-box';
       box.style.left=b.x+'%'; box.style.top=b.y+'%'; box.style.width=b.w+'%'; box.style.height=b.h+'%';
       if (b.rot) box.style.transform = `rotate(${b.rot}deg)`;
-      // 박스 너비(%)를 실제 픽셀로 변환 후 폰트 크기 계산
-      const boxWidthPx = effectiveW * (b.w / 100);
-      const fName = Math.max(6, Math.min(96, boxWidthPx * 0.15)); // 박스 너비의 15% ± 클램핑(6-96px)
+      const boxHeightPx = dispH * (b.h / 100);
+      const fName = Math.max(6, Math.min(96, boxHeightPx * 0.6));
       const ta = b.textAlign || 'left';
       const ho = b.hosu || key;
       const dong = b.dong || '';
@@ -1899,13 +1901,19 @@ function openFloorplanFullscreen(bName, fp) {
     // 방향 라벨 (상/하/좌/우) — 풀스크린
     inner.querySelectorAll('.ed-dir-label').forEach(el => el.remove());
     const dl = fp.dirLabels || {};
+    const doff = fp.dirOffsets || {};
+    const fsW = inner.offsetWidth || 1, fsH = inner.offsetHeight || 1;
     ['top','bottom','left','right'].forEach(s => {
       const txt = (dl[s] || '').trim();
       if (!txt) return;
+      const isHoriz = s === 'top' || s === 'bottom';
+      const offPx = (doff[s] || 0) * (isHoriz ? fsW : fsH);
       const el = document.createElement('div');
       el.className = 'ed-dir-label ' + s;
       el.style.fontSize = Math.max(12, Math.round(14 * scale)) + 'px';
       el.textContent = txt;
+      if (isHoriz) { el.style.left = `calc(50% + ${offPx}px)`; el.style.transform = 'translateX(-50%)'; }
+      else { el.style.top = `calc(50% + ${offPx}px)`; el.style.transform = s === 'left' ? 'translateY(-50%) rotate(-90deg)' : 'translateY(-50%) rotate(90deg)'; }
       inner.appendChild(el);
     });
   };
@@ -2914,7 +2922,6 @@ function edLoadGroup(bName, gName) {
   edDirLabels = Object.assign({ top:'', bottom:'', left:'', right:'' }, saved.dirLabels || {});
   edDirOffsets = Object.assign({ top:0, bottom:0, left:0, right:0 }, saved.dirOffsets || {});
   edApplyDirLabels();
-  edApplyDirOffsets();
 
   edActiveDong = '전체';
   edRenderGroupTabs(bName);
@@ -3714,53 +3721,10 @@ let edDirLabels = { top: '', bottom: '', left: '', right: '' };
 let edDirOffsets = { top: 0, bottom: 0, left: 0, right: 0 };
 
 function edApplyDirOffsets() {
-  ['top', 'bottom'].forEach(s => {
-    const btn = document.getElementById('edDirBtn-' + s);
-    if (!btn) return;
-    const off = edDirOffsets[s] || 0;
-    btn.style.left = `calc(50% + ${off}px)`;
-    btn.style.transform = 'translateX(-50%)';
-  });
-  ['left', 'right'].forEach(s => {
-    const btn = document.getElementById('edDirBtn-' + s);
-    if (!btn) return;
-    const off = edDirOffsets[s] || 0;
-    btn.style.top = `calc(50% + ${off}px)`;
-    btn.style.transform = 'translateY(-50%)';
-  });
+  edApplyDirLabels();
 }
 
-function edInitDirDrag() {
-  if (edInitDirDrag._done) return;
-  edInitDirDrag._done = true;
-  ['top', 'bottom', 'left', 'right'].forEach(dir => {
-    const btn = document.getElementById('edDirBtn-' + dir);
-    if (!btn) return;
-    btn.style.cursor = 'move';
-    btn.addEventListener('mousedown', e => {
-      if (e.button !== 0) return;
-      e.preventDefault(); e.stopPropagation();
-      const isHoriz = dir === 'top' || dir === 'bottom';
-      const startMouse = isHoriz ? e.clientX : e.clientY;
-      const startOff = edDirOffsets[dir] || 0;
-      let moved = false;
-      const onMove = ev => {
-        const delta = isHoriz ? (ev.clientX - startMouse) : (ev.clientY - startMouse);
-        if (Math.abs(delta) > 4) moved = true;
-        if (!moved) return;
-        edDirOffsets[dir] = startOff + delta;
-        edApplyDirOffsets();
-      };
-      const onUp = () => {
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup', onUp);
-        if (!moved) edShowDirInput(dir);
-      };
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('mouseup', onUp);
-    });
-  });
-}
+function edInitDirDrag() { /* drag is now handled inline in edApplyDirLabels */ }
 
 function edShowDirInput(dir) {
   const label = { top: '상단', bottom: '하단', left: '좌측', right: '우측' }[dir];
@@ -3778,28 +3742,65 @@ function edApplyDirLabels() {
   if (!wrap) return;
   wrap.querySelectorAll('.ed-dir-label').forEach(el => el.remove());
 
+  const canvasW = edImgNW * edZoom || wrap.offsetWidth || 1;
+  const canvasH = edImgNH * edZoom || wrap.offsetHeight || 1;
+
   ['top','bottom','left','right'].forEach(s => {
     const txt = (edDirLabels[s] || '').trim();
     if (!txt) return;
+    const isHoriz = s === 'top' || s === 'bottom';
+    const offFrac = edDirOffsets[s] || 0;
+    const offPx = offFrac * (isHoriz ? canvasW : canvasH);
+
     const el = document.createElement('div');
     el.className = 'ed-dir-label ' + s;
     el.textContent = txt;
+    el.style.pointerEvents = 'auto';
+    el.style.cursor = 'move';
+
+    if (isHoriz) {
+      el.style.left = `calc(50% + ${offPx}px)`;
+      el.style.transform = 'translateX(-50%)';
+    } else {
+      el.style.top = `calc(50% + ${offPx}px)`;
+      el.style.transform = s === 'left' ? 'translateY(-50%) rotate(-90deg)' : 'translateY(-50%) rotate(90deg)';
+    }
+
+    el.addEventListener('mousedown', e => {
+      if (e.button !== 0) return;
+      e.preventDefault(); e.stopPropagation();
+      const startMouse = isHoriz ? e.clientX : e.clientY;
+      const startOff = edDirOffsets[s] || 0;
+      const dim = isHoriz ? canvasW : canvasH;
+      const onMove = ev => {
+        const delta = isHoriz ? (ev.clientX - startMouse) : (ev.clientY - startMouse);
+        edDirOffsets[s] = startOff + delta / dim;
+        const px = edDirOffsets[s] * dim;
+        if (isHoriz) el.style.left = `calc(50% + ${px}px)`;
+        else el.style.top = `calc(50% + ${px}px)`;
+      };
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+
     wrap.appendChild(el);
   });
 
-  // 버튼에 현재 값 표시
+  // 버튼 상태 업데이트 (드래그 없음, 클릭만)
   ['top','bottom','left','right'].forEach(s => {
     const btn = document.getElementById('edDirBtn-' + s);
-    if (btn && edDirLabels[s]) {
+    if (!btn) return;
+    btn.style.left = ''; btn.style.top = ''; btn.style.transform = ''; btn.style.cursor = 'pointer';
+    if (edDirLabels[s]) {
       btn.dataset.text = edDirLabels[s];
-      btn.style.background = '#dbeafe';
-      btn.style.borderColor = '#3b82f6';
-      btn.style.color = '#3b82f6';
-    } else if (btn) {
+      btn.style.background = '#dbeafe'; btn.style.borderColor = '#3b82f6'; btn.style.color = '#3b82f6';
+    } else {
       delete btn.dataset.text;
-      btn.style.background = '#fff';
-      btn.style.borderColor = '#9ca3af';
-      btn.style.color = '#6b7280';
+      btn.style.background = '#fff'; btn.style.borderColor = '#9ca3af'; btn.style.color = '#6b7280';
     }
   });
 }
@@ -3930,7 +3931,7 @@ function edRenderAllBoxes() {
     const rotDeg = b.rot || 0;
     const displayName = b.unit?.상호명 || b.name || b.unit?.호수 || bkey;
     const boxHeightPx = (edImgNH * edZoom) * (b.h / 100);
-    const fName = Math.max(6, Math.min(96, boxHeightPx * 0.42));
+    const fName = Math.max(6, Math.min(96, boxHeightPx * 0.6));
     el.innerHTML = `<div class="obox-hosu">${b.unit?.호수||bkey}</div><div class="obox-name" style="text-align:${ta};font-size:${fName}px">${displayName}</div><div class="obox-del">✕</div><div class="obox-rotate-label">${rotDeg}°</div><div class="obox-rotate" title="드래그하여 회전">↻</div><div class="obox-resize"></div>`;
     el.querySelector('.obox-del').addEventListener('click',ev=>{ev.stopPropagation();delete edBoxes[bkey];edRenderAllBoxes();edRenderUnitList();});
     el.querySelector('.obox-rotate').addEventListener('mousedown',edStartRotate);
